@@ -6,12 +6,13 @@ interface Props {
   booth_number: string
   hall: string
   visited: boolean
+  subtle?: boolean
   onCheckIn: (id: string) => void
 }
 
-export default function ExhibitorCard({ id, name, booth_number, hall, visited, onCheckIn }: Props) {
+export default function ExhibitorCard({ id, name, booth_number, hall, visited, subtle, onCheckIn }: Props) {
   return (
-    <div className={`rounded-xl border p-4 flex items-center justify-between ${visited ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+    <div className={`rounded-xl border p-4 flex items-center justify-between ${visited ? 'border-green-300 bg-green-50' : subtle ? 'border-gray-200 bg-primary-subtle' : 'border-gray-200 bg-white'}`}>
       <div>
         <p className="font-semibold text-gray-900 text-sm">{name}</p>
         <p className="text-xs text-gray-500">{booth_number} · {hall}</p>

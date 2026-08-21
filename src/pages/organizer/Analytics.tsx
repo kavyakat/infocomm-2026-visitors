@@ -274,7 +274,7 @@ export default function Analytics() {
                         const maxVisits = stats.hallDist[0].visitCount
                         const pct = maxVisits > 0 ? Math.round((row.visitCount / maxVisits) * 100) : 0
                         return (
-                          <tr key={row.hall}>
+                          <tr key={row.hall} className="odd:bg-primary-subtle">
                             <td className="px-5 py-3 font-medium text-gray-900">{row.hall}</td>
                             <td className="px-5 py-3 text-right text-gray-700">{row.exhibitorCount}</td>
                             <td className="px-5 py-3 text-right text-gray-700">{row.visitCount}</td>

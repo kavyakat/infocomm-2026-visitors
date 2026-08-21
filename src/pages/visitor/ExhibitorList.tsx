@@ -59,13 +59,14 @@ export default function ExhibitorList() {
         {loading && <p className="text-center text-sm text-gray-400 py-8">Loading…</p>}
 
         <div className="space-y-2">
-          {filtered.map(e => (
+          {filtered.map((e, i) => (
             <ExhibitorCard
               key={e.id}
               id={e.id}
               name={e.name}
               booth_number={e.booth_number}
               hall={e.hall}
+              subtle={i % 2 === 0}
               visited={hasVisited(e.id)}
               onCheckIn={id => navigate(`/check-in/${id}`)}
             />

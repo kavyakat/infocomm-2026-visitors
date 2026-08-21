@@ -9,6 +9,7 @@ export default {
           DEFAULT: '#7B2D8B',
           light: '#9B4DAB',
           dark: '#5B1D6B',
+          subtle: '#fbf2fd',
         },
       },
     },

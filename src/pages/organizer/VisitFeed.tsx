@@ -122,7 +122,7 @@ export default function VisitFeed() {
             {visits.map(visit => (
               <div
                 key={visit.id}
-                className="bg-white rounded-lg border border-gray-200 px-5 py-3 flex items-center gap-4"
+                className="odd:bg-primary-subtle bg-white rounded-lg border border-gray-200 px-5 py-3 flex items-center gap-4"
               >
                 <span className="text-xs font-semibold bg-primary text-white rounded-full px-2 py-0.5 shrink-0">
                   Day {visit.day}

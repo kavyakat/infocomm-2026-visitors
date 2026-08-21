@@ -18,6 +18,12 @@ export default function Exhibitors() {
   const [adding, setAdding] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', booth_number: '', hall: '' })
+  const [editError, setEditError] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [hallFilter, setHallFilter] = useState('')
 
   async function loadExhibitors() {
     const { data } = await supabase.from('exhibitors').select('*').order('name')
@@ -86,12 +92,38 @@ export default function Exhibitors() {
     setDeleting(false)
   }
 
+  async function handleEditSave() {
+    if (!editForm.name.trim() || !editForm.booth_number.trim() || !editForm.hall.trim()) {
+      setEditError('All fields are required')
+      return
+    }
+    setEditSaving(true)
+    setEditError('')
+    const { error } = await supabase.from('exhibitors').update({
+      name: editForm.name.trim(),
+      booth_number: editForm.booth_number.trim(),
+      hall: editForm.hall.trim(),
+    }).eq('id', editId!)
+    if (error) { setEditError(error.message); setEditSaving(false); return }
+    setEditId(null)
+    await loadExhibitors()
+    setEditSaving(false)
+  }
+
   async function regenPin(exhibitor: Exhibitor) {
     const otherPins = new Set(exhibitors.filter(ex => ex.id !== exhibitor.id).map(ex => ex.pin))
     const newPin = generatePin(otherPins)
     const { error } = await supabase.from('exhibitors').update({ pin: newPin }).eq('id', exhibitor.id)
     if (!error) await loadExhibitors()
   }
+
+  const halls = Array.from(new Set(exhibitors.map(ex => ex.hall))).sort()
+  const filteredExhibitors = exhibitors.filter(ex => {
+    const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase()) ||
+      ex.booth_number.toLowerCase().includes(search.toLowerCase())
+    const matchesHall = !hallFilter || ex.hall === hallFilter
+    return matchesSearch && matchesHall
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,12 +227,34 @@ export default function Exhibitors() {
 
         {importError && <p className="text-red-500 text-sm">{importError}</p>}
 
+        {!loading && exhibitors.length > 0 && (
+          <div className="flex gap-3">
+            <input
+              type="search"
+              placeholder="Search by name or booth…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <select
+              value={hallFilter}
+              onChange={e => setHallFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            >
+              <option value="">All halls</option>
+              {halls.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : exhibitors.length === 0 ? (
           <p className="text-gray-500 text-center py-12">No exhibitors yet. Add one or import a CSV to get started.</p>
+        ) : filteredExhibitors.length === 0 ? (
+          <p className="text-gray-500 text-center py-12">No exhibitors match your search.</p>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
@@ -214,46 +268,99 @@ export default function Exhibitors() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {exhibitors.map(ex => (
-                  <tr key={ex.id}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{ex.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{ex.booth_number}</td>
-                    <td className="px-4 py-3 text-gray-600">{ex.hall}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{ex.pin}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => regenPin(ex)}
-                          className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
-                        >
-                          Regen PIN
-                        </button>
-                        {confirmDeleteId === ex.id ? (
-                          <>
+                {filteredExhibitors.map(ex => (
+                  <tr key={ex.id} className="odd:bg-primary-subtle">
+                    {editId === ex.id ? (
+                      <>
+                        <td className="px-2 py-2">
+                          <input
+                            value={editForm.name}
+                            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            value={editForm.booth_number}
+                            onChange={e => setEditForm(f => ({ ...f, booth_number: e.target.value }))}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            value={editForm.hall}
+                            onChange={e => setEditForm(f => ({ ...f, hall: e.target.value }))}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-2 font-mono font-bold text-primary">{ex.pin}</td>
+                        <td className="px-2 py-2 text-right">
+                          {editError && <p className="text-red-500 text-xs mb-1">{editError}</p>}
+                          <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleDelete(ex.id)}
-                              disabled={deleting}
-                              className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-1 disabled:opacity-50"
+                              onClick={handleEditSave}
+                              disabled={editSaving}
+                              className="text-xs text-white bg-primary hover:opacity-90 rounded px-2 py-1 disabled:opacity-50"
                             >
-                              {deleting ? '…' : 'Confirm'}
+                              {editSaving ? '…' : 'Save'}
                             </button>
                             <button
-                              onClick={() => setConfirmDeleteId(null)}
+                              onClick={() => { setEditId(null); setEditError('') }}
                               className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
                             >
                               Cancel
                             </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteId(ex.id)}
-                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-2 py-1"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-gray-900">{ex.name}</td>
+                        <td className="px-4 py-3 text-gray-600">{ex.booth_number}</td>
+                        <td className="px-4 py-3 text-gray-600">{ex.hall}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-primary">{ex.pin}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => { setEditId(ex.id); setEditForm({ name: ex.name, booth_number: ex.booth_number, hall: ex.hall }); setEditError('') }}
+                              className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => regenPin(ex)}
+                              className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
+                            >
+                              Regen PIN
+                            </button>
+                            {confirmDeleteId === ex.id ? (
+                              <>
+                                <button
+                                  onClick={() => handleDelete(ex.id)}
+                                  disabled={deleting}
+                                  className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-1 disabled:opacity-50"
+                                >
+                                  {deleting ? '…' : 'Confirm'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteId(ex.id)}
+                                className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-2 py-1"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

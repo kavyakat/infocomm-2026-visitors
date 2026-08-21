@@ -87,7 +87,7 @@ export default function Leaderboard() {
                 <div
                   key={entry.id}
                   className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-                    isMe ? 'bg-primary/10 border-primary' : 'bg-white border-gray-200'
+                    isMe ? 'bg-primary/10 border-primary' : i % 2 === 0 ? 'bg-primary-subtle border-gray-200' : 'bg-white border-gray-200'
                   }`}
                 >
                   <span className="w-7 text-center text-sm font-bold text-gray-500">
