@@ -7,6 +7,8 @@ export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [mobile, setMobile] = useState('')
+  const [company, setCompany] = useState('')
+  const [designation, setDesignation] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -26,7 +28,8 @@ export default function Register() {
     if (!userId) { setError('Registration failed'); setLoading(false); return }
 
     const { error: profileError } = await supabase.from('profiles').insert({
-      id: userId, name, email, mobile, role: 'visitor'
+      id: userId, name, email, mobile, role: 'visitor',
+      company_name: company, designation,
     })
 
     if (profileError) { setError(profileError.message); setLoading(false); return }
@@ -42,6 +45,9 @@ export default function Register() {
           <p className="text-sm opacity-80">Visitor Registration</p>
         </div>
         <form onSubmit={handleSubmit} className="border border-gray-200 rounded-b-2xl p-6 space-y-4">
+          <div className="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded">
+            <p className="text-xs text-amber-800">Please use the same email address you used to register for your InfoComm India show badge.</p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <input
@@ -68,6 +74,24 @@ export default function Register() {
               required
               value={mobile}
               onChange={e => setMobile(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <input
+              required
+              value={company}
+              onChange={e => setCompany(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
+            <input
+              required
+              value={designation}
+              onChange={e => setDesignation(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>

@@ -29,6 +29,9 @@ export default function Login() {
           <p className="text-sm opacity-80">Visitor Sign In</p>
         </div>
         <form onSubmit={handleSubmit} className="border border-gray-200 rounded-b-2xl p-6 space-y-4">
+          <div className="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded">
+            <p className="text-xs text-amber-800">Please use the same email address you used to register for your InfoComm India show badge.</p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
