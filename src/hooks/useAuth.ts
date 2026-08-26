@@ -5,6 +5,7 @@ type AuthState = {
   profile: Profile | null
   loading: boolean
   signOut: () => Promise<void>
+  setProfile: (p: Profile) => void
 }
 
 export function useAuth(): AuthState {
@@ -29,5 +30,5 @@ export function useAuth(): AuthState {
     await supabase.auth.signOut()
   }
 
-  return { profile, loading, signOut }
+  return { profile, loading, signOut, setProfile }
 }
