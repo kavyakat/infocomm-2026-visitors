@@ -92,12 +92,12 @@ export default function MyEligibility() {
             label={`Days attended: ${result.daysVisited} of ${config.minQualifyingDays} required`}
           />
           <Row
-            done={result.hallsCovered.includes('Jasmine Hall')}
-            label={`Jasmine Hall visited${result.hallsCovered.includes('Jasmine Hall') ? '' : ' (not yet)'}`}
+            done={result.hallsCovered.includes('Jasmine Halls')}
+            label={`Jasmine Halls visited${result.hallsCovered.includes('Jasmine Halls') ? '' : ' (not yet)'}`}
           />
           <Row
-            done={result.hallsCovered.includes('Pavilion Hall')}
-            label={`Pavilion Hall visited${result.hallsCovered.includes('Pavilion Hall') ? '' : ' (not yet)'}`}
+            done={result.hallsCovered.includes('Pavilion Halls')}
+            label={`Pavilion Halls visited${result.hallsCovered.includes('Pavilion Halls') ? '' : ' (not yet)'}`}
           />
           <Row
             done={result.platinumVisits >= config.minPlatinumVisits}

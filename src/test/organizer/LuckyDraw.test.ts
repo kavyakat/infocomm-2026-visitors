@@ -12,11 +12,11 @@ const platinumIds = new Set(['p1', 'p2', 'p3'])
 
 function eligibleVisits(visitorId: string) {
   return [
-    { visitor_id: visitorId, exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
-    { visitor_id: visitorId, exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 as const },
-    { visitor_id: visitorId, exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 as const },
-    { visitor_id: visitorId, exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 as const },
-    { visitor_id: visitorId, exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 as const },
+    { visitor_id: visitorId, exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const },
+    { visitor_id: visitorId, exhibitor_id: 'e2', hall: 'Pavilion Halls', day: 2 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 2 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p3', hall: 'Pavilion Halls', day: 1 as const },
   ]
 }
 
@@ -35,10 +35,10 @@ describe('buildCandidates', () => {
 
   it('excludes visitor missing a qualifying hall', () => {
     const visits = [
-      { visitor_id: 'v2', exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
-      { visitor_id: 'v2', exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 2 as const },
-      { visitor_id: 'v2', exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 1 as const },
-      { visitor_id: 'v2', exhibitor_id: 'p3', hall: 'Jasmine Hall', day: 2 as const },
+      { visitor_id: 'v2', exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 2 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 1 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p3', hall: 'Jasmine Halls', day: 2 as const },
     ]
     const profiles = new Map([['v2', { name: 'Bob', email: 'bob@example.com' }]])
     const social = new Map([['v2', true]])
@@ -58,7 +58,7 @@ describe('buildCandidates', () => {
   it('includes eligible and excludes ineligible from mixed input', () => {
     const visits = [
       ...eligibleVisits('eligible'),
-      { visitor_id: 'ineligible', exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+      { visitor_id: 'ineligible', exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const },
     ]
     const profiles = new Map([
       ['eligible', { name: 'Eligible User', email: 'e@example.com' }],
