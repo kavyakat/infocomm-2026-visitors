@@ -45,6 +45,10 @@ export default function LuckyDraw() {
   const [drawing, setDrawing] = useState(false)
   const [newWinnerId, setNewWinnerId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [manualSearch, setManualSearch] = useState('')
+  const [manualResults, setManualResults] = useState<Array<{ id: string; name: string; email: string; company_name: string; designation: string }>>([])
+  const [manualSearching, setManualSearching] = useState(false)
+  const [manualAdding, setManualAdding] = useState<Set<string>>(new Set())
 
   async function loadWinners() {
     const { data, error: err } = await supabase
@@ -229,6 +233,59 @@ export default function LuckyDraw() {
     setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
   }
 
+  async function searchVisitors() {
+    if (!manualSearch.trim()) return
+    setManualSearching(true)
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, email, company_name, designation')
+      .eq('role', 'visitor')
+      .or(`name.ilike.%${manualSearch.trim()}%,email.ilike.%${manualSearch.trim()}%`)
+      .limit(8)
+    setManualResults((data ?? []) as Array<{ id: string; name: string; email: string; company_name: string; designation: string }>)
+    setManualSearching(false)
+  }
+
+  async function manualAddToPool(v: { id: string; name: string; email: string; company_name: string; designation: string }) {
+    setManualAdding(prev => new Set(prev).add(v.id))
+    setError('')
+    try {
+      const { error: insertErr } = await supabase
+        .from('lucky_draw_eligible_snapshot')
+        .insert({
+          visitor_id: v.id,
+          name: v.name,
+          email: v.email,
+          mobile: '',
+          company_name: v.company_name,
+          designation: v.designation,
+          days_visited: 0,
+          halls_covered: 'Manual override',
+          platinum_visits: 0,
+          social_complete: false,
+        })
+      if (insertErr) { setError(insertErr.message); return }
+      setPool(prev => [...prev, { id: v.id, name: v.name, email: v.email }])
+      setSnapshot(prev => [...prev, {
+        id: crypto.randomUUID(),
+        visitor_id: v.id,
+        name: v.name,
+        email: v.email,
+        mobile: '',
+        company_name: v.company_name,
+        designation: v.designation,
+        days_visited: 0,
+        halls_covered: 'Manual override',
+        platinum_visits: 0,
+        social_complete: false,
+      }])
+      setPoolBuilt(true)
+      setManualResults(prev => prev.filter(r => r.id !== v.id))
+    } finally {
+      setManualAdding(prev => { const n = new Set(prev); n.delete(v.id); return n })
+    }
+  }
+
   function enterFullscreen() {
     document.documentElement.requestFullscreen().catch(() => {})
   }
@@ -307,6 +364,58 @@ export default function LuckyDraw() {
           >
             {building ? 'Building…' : 'Build Eligible Pool'}
           </button>
+        </div>
+
+        {/* Manual add */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+          <p className="font-semibold text-gray-900 text-sm">Add Visitor Manually</p>
+          <div className="flex gap-2">
+            <input
+              type="search"
+              placeholder="Search by name or email…"
+              value={manualSearch}
+              onChange={e => setManualSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') searchVisitors() }}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              onClick={searchVisitors}
+              disabled={manualSearching || !manualSearch.trim()}
+              className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+            >
+              {manualSearching ? '…' : 'Search'}
+            </button>
+          </div>
+          {manualResults.length > 0 && (
+            <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+              {manualResults.map(v => {
+                const alreadyIn = pool.some(c => c.id === v.id) || winners.some(w => w.visitor_id === v.id && !w.redrawn)
+                const adding = manualAdding.has(v.id)
+                return (
+                  <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{v.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{v.email}{v.company_name ? ` · ${v.company_name}` : ''}</div>
+                    </div>
+                    <button
+                      onClick={() => manualAddToPool(v)}
+                      disabled={alreadyIn || adding}
+                      className={`ml-3 shrink-0 text-xs font-semibold px-3 py-1 rounded border transition-colors ${
+                        alreadyIn
+                          ? 'border-gray-200 text-gray-400 cursor-default'
+                          : 'bg-primary text-white border-primary hover:opacity-90 disabled:opacity-50'
+                      }`}
+                    >
+                      {adding ? '…' : alreadyIn ? 'In pool' : '+ Add'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {manualResults.length === 0 && manualSearch && !manualSearching && (
+            <p className="text-xs text-gray-400">No results. Try a different name or email.</p>
+          )}
         </div>
 
         {/* Draw controls */}
