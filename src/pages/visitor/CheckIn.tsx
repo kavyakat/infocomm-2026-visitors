@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { db } from '../../lib/db'
 import { flushVisitQueue } from '../../lib/sync'
 import { verifyPin } from '../../lib/pins'
 import { getCurrentEventDay } from '../../lib/eventDay'
+import { supabase } from '../../lib/supabase'
 import NumPad from '../../components/NumPad'
 import StarRating from '../../components/StarRating'
 import SocialFooter from '../../components/SocialFooter'
@@ -22,6 +23,22 @@ export default function CheckIn() {
   const [confirmedExhibitorName, setConfirmedExhibitorName] = useState('')
   const [visitId] = useState(() => crypto.randomUUID())
   const [visitTime] = useState(() => new Date())
+  const [eventDay, setEventDay] = useState<1 | 2 | 3>(() => getCurrentEventDay())
+
+  useEffect(() => {
+    async function fetchDay() {
+      const { data } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'current_event_day')
+        .single()
+      if (data?.value) {
+        const d = Number(data.value)
+        if (d >= 1 && d <= 3) setEventDay(d as 1 | 2 | 3)
+      }
+    }
+    fetchDay()
+  }, [])
 
   async function handleConfirmPin() {
     if (!exhibitorId || !profile || confirming) return
@@ -59,7 +76,7 @@ export default function CheckIn() {
       visitor_id: profile.id,
       exhibitor_id: exhibitorId,
       visited_at: visitTime.toISOString(),
-      day: getCurrentEventDay(),
+      day: eventDay,
       rating,
       synced: false,
     })

@@ -8,6 +8,7 @@ export default function Settings() {
   const [minDays, setMinDays] = useState(2)
   const [minPlatinum, setMinPlatinum] = useState(3)
   const [minCheckins, setMinCheckins] = useState(0)
+  const [eventDay, setEventDay] = useState<1 | 2 | 3>(1)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -16,13 +17,15 @@ export default function Settings() {
     supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins'])
+      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day'])
       .then(({ data }) => {
         if (!data) return
         const m = new Map(data.map(r => [r.key, r.value]))
         setMinDays(Number(m.get('min_qualifying_days') ?? 2))
         setMinPlatinum(Number(m.get('min_platinum_visits') ?? 3))
         setMinCheckins(Number(m.get('min_total_checkins') ?? 0))
+        const d = Number(m.get('current_event_day') ?? 1)
+        setEventDay((d >= 1 && d <= 3 ? d : 1) as 1 | 2 | 3)
       })
   }, [])
 
@@ -36,6 +39,7 @@ export default function Settings() {
       { key: 'min_qualifying_days', value: String(minDays) },
       { key: 'min_platinum_visits', value: String(minPlatinum) },
       { key: 'min_total_checkins', value: String(minCheckins) },
+      { key: 'current_event_day', value: String(eventDay) },
     ])
 
     if (upsertErr) {
@@ -111,6 +115,29 @@ export default function Settings() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-gray-400 mt-1">0 = no minimum</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Current event day
+            </label>
+            <div className="flex gap-3">
+              {([1, 2, 3] as const).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setEventDay(d)}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                    eventDay === d
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Day {d}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">All new check-ins will be recorded against this day</p>
           </div>
 
           <button
