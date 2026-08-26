@@ -117,6 +117,14 @@ export default function Exhibitors() {
     if (!error) await loadExhibitors()
   }
 
+  async function togglePlatinum(exhibitor: Exhibitor) {
+    const { error } = await supabase
+      .from('exhibitors')
+      .update({ is_platinum: !exhibitor.is_platinum })
+      .eq('id', exhibitor.id)
+    if (!error) setExhibitors(prev => prev.map(ex => ex.id === exhibitor.id ? { ...ex, is_platinum: !ex.is_platinum } : ex))
+  }
+
   const halls = Array.from(new Set(exhibitors.map(ex => ex.hall))).sort()
   const filteredExhibitors = exhibitors.filter(ex => {
     const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -156,6 +164,7 @@ export default function Exhibitors() {
           <Link to="/organizer/feed" className="hover:underline">Feed</Link>
           <Link to="/organizer/analytics" className="hover:underline">Analytics</Link>
           <Link to="/organizer/draw" className="hover:underline">Lucky Draw</Link>
+          <Link to="/organizer/settings" className="hover:underline">Settings</Link>
           <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
           <button onClick={signOut} className="bg-white text-primary font-semibold px-3 py-1 rounded">Sign Out</button>
         </div>
@@ -264,6 +273,7 @@ export default function Exhibitors() {
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">Booth</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">Hall</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">PIN</th>
+                  <th className="text-center px-4 py-3 font-semibold text-gray-700">Platinum</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -294,6 +304,13 @@ export default function Exhibitors() {
                           />
                         </td>
                         <td className="px-4 py-2 font-mono font-bold text-primary">{ex.pin}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => togglePlatinum(ex)}
+                            className={`text-lg leading-none ${ex.is_platinum ? 'text-amber-500' : 'text-gray-300 hover:text-amber-300'}`}
+                            title={ex.is_platinum ? 'Remove platinum' : 'Mark as platinum'}
+                          >★</button>
+                        </td>
                         <td className="px-2 py-2 text-right">
                           {editError && <p className="text-red-500 text-xs mb-1">{editError}</p>}
                           <div className="flex items-center justify-end gap-2">
@@ -319,6 +336,13 @@ export default function Exhibitors() {
                         <td className="px-4 py-3 text-gray-600">{ex.booth_number}</td>
                         <td className="px-4 py-3 text-gray-600">{ex.hall}</td>
                         <td className="px-4 py-3 font-mono font-bold text-primary">{ex.pin}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => togglePlatinum(ex)}
+                            className={`text-lg leading-none ${ex.is_platinum ? 'text-amber-500' : 'text-gray-300 hover:text-amber-300'}`}
+                            title={ex.is_platinum ? 'Remove platinum' : 'Mark as platinum'}
+                          >★</button>
+                        </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button
