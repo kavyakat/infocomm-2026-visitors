@@ -19,7 +19,7 @@ export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/', element: <VisitorRoute><ExhibitorList /></VisitorRoute> },
   { path: '/check-in/:exhibitorId', element: <VisitorRoute><CheckIn /></VisitorRoute> },
-  { path: '/leaderboard', element: <VisitorRoute><Leaderboard /></VisitorRoute> },
+  { path: '/leaderboard', element: <Leaderboard /> },
   { path: '/my-eligibility', element: <VisitorRoute><MyEligibility /></VisitorRoute> },
   { path: '/organizer/login', element: <OrganizerLogin /> },
   { path: '/organizer', element: <OrganizerRoute><Exhibitors /></OrganizerRoute> },
