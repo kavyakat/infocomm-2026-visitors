@@ -37,6 +37,7 @@ type Stats = {
   engagementDist: Array<{ bucket: string; count: number }>
   qualRows: QualRow[]
   allVisitRows: Array<Record<string, unknown>>
+  config: EligibilityConfig
 }
 
 function StatCard({ value, label }: { value: number | string; label: string }) {
@@ -75,6 +76,7 @@ export default function Analytics() {
   const [exporting, setExporting] = useState(false)
   const [togglingLeaderboard, setTogglingLeaderboard] = useState(false)
   const [qualFilter, setQualFilter] = useState<'all' | 'qualified' | 'not-qualified'>('all')
+  const [visitorSearch, setVisitorSearch] = useState('')
   const [error, setError] = useState('')
 
   async function handleExport() {
@@ -271,6 +273,7 @@ export default function Analytics() {
         engagementDist,
         qualRows,
         allVisitRows,
+        config,
       })
       setLoading(false)
     }
@@ -480,15 +483,24 @@ export default function Analytics() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold text-gray-800">Visitor Qualification Breakdown</h2>
-                <select
-                  value={qualFilter}
-                  onChange={e => setQualFilter(e.target.value as typeof qualFilter)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-                >
-                  <option value="all">All visitors</option>
-                  <option value="qualified">Qualified only</option>
-                  <option value="not-qualified">Not qualified</option>
-                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="search"
+                    placeholder="Search visitor…"
+                    value={visitorSearch}
+                    onChange={e => setVisitorSearch(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <select
+                    value={qualFilter}
+                    onChange={e => setQualFilter(e.target.value as typeof qualFilter)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                  >
+                    <option value="all">All visitors</option>
+                    <option value="qualified">Qualified only</option>
+                    <option value="not-qualified">Not qualified</option>
+                  </select>
+                </div>
               </div>
               {stats.qualRows.length === 0 ? (
                 <p className="text-gray-500 text-sm">No visitor data available.</p>
@@ -509,21 +521,33 @@ export default function Analytics() {
                     <tbody className="divide-y divide-gray-100">
                       {stats.qualRows
                         .filter(r => qualFilter === 'all' || (qualFilter === 'qualified' ? r.qualified : !r.qualified))
-                        .map(r => (
-                          <tr key={r.visitor_id} className="odd:bg-primary-subtle">
-                            <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
-                            <td className="px-4 py-3 text-gray-600 text-xs">{r.company}</td>
-                            <td className="px-4 py-3 text-center text-gray-700">{r.days}</td>
-                            <td className="px-4 py-3 text-gray-600 text-xs">{r.halls || '—'}</td>
-                            <td className="px-4 py-3 text-center text-gray-700">{r.platinum}</td>
-                            <td className="px-4 py-3 text-center">{r.social ? '✓' : '—'}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.qualified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                {r.qualified ? 'Yes' : 'No'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        .filter(r => !visitorSearch || r.name.toLowerCase().includes(visitorSearch.toLowerCase()) || r.company.toLowerCase().includes(visitorSearch.toLowerCase()))
+                        .map(r => {
+                          const platOk = r.platinum >= stats.config.minPlatinumVisits
+                          return (
+                            <tr key={r.visitor_id} className="odd:bg-primary-subtle">
+                              <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
+                              <td className="px-4 py-3 text-gray-600 text-xs">{r.company}</td>
+                              <td className="px-4 py-3 text-center text-gray-700">{r.days}</td>
+                              <td className="px-4 py-3 text-gray-600 text-xs">{r.halls || '—'}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`text-xs font-semibold ${platOk ? 'text-green-700' : 'text-red-600'}`}>
+                                  {r.platinum}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {r.social
+                                  ? <span className="text-green-600 font-bold">✓</span>
+                                  : <span className="text-red-500 font-bold">✗</span>}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.qualified ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                                  {r.qualified ? 'Yes' : 'No'}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
                     </tbody>
                   </table>
                 </div>
