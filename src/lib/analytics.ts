@@ -1,13 +1,20 @@
-import { isEligible } from './scoring'
+import { checkEligibility, type EligibilityConfig } from './eligibility'
 
 export function eligibleCount(
-  visitsByVisitor: Map<string, Array<{ day: 1 | 2 | 3 }>>
+  visitsByVisitor: Map<string, Array<{ exhibitor_id: string; hall: string; day: 1 | 2 | 3 }>>,
+  platinumIds: Set<string>,
+  socialByVisitor: Map<string, boolean>,
+  config: EligibilityConfig
 ): number {
   let count = 0
-  for (const visits of visitsByVisitor.values()) {
-    if (isEligible(visits.map(v => ({ exhibitor_id: '', hall: '', day: v.day, rating: null })))) {
-      count++
-    }
+  for (const [visitorId, visits] of visitsByVisitor.entries()) {
+    const result = checkEligibility({
+      visits,
+      platinumIds,
+      socialComplete: socialByVisitor.get(visitorId) ?? false,
+      config,
+    })
+    if (result.eligible) count++
   }
   return count
 }

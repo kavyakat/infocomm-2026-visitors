@@ -1,22 +1,37 @@
 import { describe, it, expect } from 'vitest'
 import { eligibleCount, buildHallDistribution } from '../../lib/analytics'
+import { type EligibilityConfig } from '../../lib/eligibility'
+
+const CONFIG: EligibilityConfig = { minQualifyingDays: 2, minPlatinumVisits: 3, minTotalCheckins: 0 }
+const platinumIds = new Set(['p1', 'p2', 'p3'])
 
 describe('eligibleCount', () => {
-  it('counts only visitors with ≥10 visits on day 1 AND ≥10 on day 2', () => {
-    const day1 = (n: number) => Array.from({ length: n }, () => ({ day: 1 as const }))
-    const day2 = (n: number) => Array.from({ length: n }, () => ({ day: 2 as const }))
+  it('counts eligible visitors using checkEligibility rules', () => {
+    const eligibleVisits = [
+      { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+      { exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 as const },
+      { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 as const },
+      { exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 as const },
+      { exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 as const },
+    ]
+    const ineligibleVisits = [
+      { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+    ]
 
-    const map = new Map<string, Array<{ day: 1 | 2 | 3 }>>()
-    // Visitor A: 10 day1 + 10 day2 → eligible
-    map.set('A', [...day1(10), ...day2(10)])
-    // Visitor B: 9 day1 + 10 day2 → not eligible
-    map.set('B', [...day1(9), ...day2(10)])
-    // Visitor C: 10 day1 + 9 day2 → not eligible
-    map.set('C', [...day1(10), ...day2(9)])
-    // Visitor D: 0 visits → not eligible
-    map.set('D', [])
+    const visitsByVisitor = new Map([
+      ['eligible', eligibleVisits],
+      ['ineligible', ineligibleVisits],
+    ])
+    const social = new Map([['eligible', true], ['ineligible', false]])
 
-    expect(eligibleCount(map)).toBe(1)
+    expect(eligibleCount(visitsByVisitor, platinumIds, social, CONFIG)).toBe(1)
+  })
+
+  it('returns 0 when no visitors meet all criteria', () => {
+    const visitsByVisitor = new Map([['v1', [{ exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const }]]])
+    const social = new Map([['v1', false]])
+
+    expect(eligibleCount(visitsByVisitor, platinumIds, social, CONFIG)).toBe(0)
   })
 })
 

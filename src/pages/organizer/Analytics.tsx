@@ -10,6 +10,7 @@ import {
   buildTopExhibitors,
   buildEngagementDist,
 } from '../../lib/analytics'
+import { type EligibilityConfig } from '../../lib/eligibility'
 
 type Stats = {
   totalVisits: number
@@ -123,8 +124,8 @@ export default function Analytics() {
     async function load() {
       const [visitsRes, exhibitorsRes, settingsRes] = await Promise.all([
         supabase.from('visits').select('visitor_id, day, exhibitor_id, visited_at, rating'),
-        supabase.from('exhibitors').select('id, hall, name, booth_number'),
-        supabase.from('settings').select('value').eq('key', 'leaderboard_visible').single(),
+        supabase.from('exhibitors').select('id, hall, name, booth_number, is_platinum'),
+        supabase.from('settings').select('key, value').in('key', ['leaderboard_visible', 'min_qualifying_days', 'min_platinum_visits', 'min_total_checkins']),
       ])
 
       if (visitsRes.error) { setError(visitsRes.error.message); setLoading(false); return }
@@ -142,21 +143,37 @@ export default function Analytics() {
         hall: string
         name: string
         booth_number: string
+        is_platinum: boolean
       }>
+
+      const settingsRows = (settingsRes.data ?? []) as Array<{ key: string; value: string }>
+      const settingsMap = new Map(settingsRows.map(r => [r.key, r.value]))
+      const leaderboardVisible = settingsMap.get('leaderboard_visible') === 'true'
+      const config: EligibilityConfig = {
+        minQualifyingDays: Number(settingsMap.get('min_qualifying_days') ?? 2),
+        minPlatinumVisits: Number(settingsMap.get('min_platinum_visits') ?? 3),
+        minTotalCheckins: Number(settingsMap.get('min_total_checkins') ?? 0),
+      }
+      const platinumIds = new Set(allExhibitors.filter(e => e.is_platinum).map(e => e.id))
 
       const totalVisits = allVisits.length
       const uniqueVisitors = new Set(allVisits.map(v => v.visitor_id)).size
       const totalExhibitors = allExhibitors.length
 
-      const visitsByVisitor = new Map<string, Array<{ day: 1 | 2 | 3 }>>()
+      const visitsByVisitor = new Map<string, Array<{ exhibitor_id: string; hall: string; day: 1 | 2 | 3 }>>()
+      const exhibitorHallMap = new Map(allExhibitors.map(e => [e.id, e.hall]))
       for (const v of allVisits) {
         if (!visitsByVisitor.has(v.visitor_id)) visitsByVisitor.set(v.visitor_id, [])
-        visitsByVisitor.get(v.visitor_id)!.push({ day: v.day })
+        visitsByVisitor.get(v.visitor_id)!.push({
+          exhibitor_id: v.exhibitor_id,
+          hall: exhibitorHallMap.get(v.exhibitor_id) ?? '',
+          day: v.day,
+        })
       }
 
-      const eligible = eligibleCount(visitsByVisitor)
+      const socialByVisitor = new Map<string, boolean>()
+      const eligible = eligibleCount(visitsByVisitor, platinumIds, socialByVisitor, config)
       const hallDist = buildHallDistribution(allExhibitors, allVisits)
-      const leaderboardVisible = settingsRes.data?.value === 'true'
 
       const hourlyDist = buildHourlyDist(allVisits)
 

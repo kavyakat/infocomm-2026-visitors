@@ -1,5 +1,3 @@
-import { calculateScore, type VisitRecord } from './scoring'
-
 export type RawVisit = {
   visitor_id: string
   exhibitor_id: string
@@ -8,7 +6,16 @@ export type RawVisit = {
   rating: number | null
 }
 
+type VisitRecord = { exhibitor_id: string; hall: string; day: 1 | 2 | 3; rating: number | null }
 type LeaderboardEntry = { id: string; name: string; score: number; visitCount: number }
+
+function calculateScore(visits: VisitRecord[]): number {
+  const uniqueVisits = visits.length
+  const uniqueHalls = new Set(visits.map(v => v.hall)).size
+  const daysActive = new Set(visits.map(v => v.day)).size
+  const ratingsSum = visits.reduce((sum, v) => sum + (v.rating ?? 2.5), 0)
+  return uniqueVisits * 1 + uniqueHalls * 5 + daysActive * 3 + ratingsSum
+}
 
 export function formatName(name: string): string {
   const parts = name.trim().split(/\s+/)

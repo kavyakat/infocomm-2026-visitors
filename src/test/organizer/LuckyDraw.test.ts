@@ -1,79 +1,81 @@
 import { describe, it, expect } from 'vitest'
 import { buildCandidates, nextPrizeRank } from '../../lib/luckyDraw'
+import { type EligibilityConfig } from '../../lib/eligibility'
 
-const day1Visits = (n: number, hall = 'H1') =>
-  Array.from({ length: n }, () => ({ visitor_id: 'v1', day: 1 as const, hall, rating: null }))
+const BASE_CONFIG: EligibilityConfig = {
+  minQualifyingDays: 2,
+  minPlatinumVisits: 3,
+  minTotalCheckins: 0,
+}
 
-const day2Visits = (n: number, hall = 'H1') =>
-  Array.from({ length: n }, () => ({ visitor_id: 'v1', day: 2 as const, hall, rating: null }))
+const platinumIds = new Set(['p1', 'p2', 'p3'])
+
+function eligibleVisits(visitorId: string) {
+  return [
+    { visitor_id: visitorId, exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+    { visitor_id: visitorId, exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 as const },
+    { visitor_id: visitorId, exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 as const },
+  ]
+}
 
 describe('buildCandidates', () => {
-  it('includes eligible visitor with correct score', () => {
-    const visits = [
-      ...day1Visits(10, 'H1'),
-      ...day2Visits(10, 'H2'),
-    ]
+  it('includes eligible visitor in pool', () => {
     const profiles = new Map([['v1', { name: 'Alice', email: 'alice@example.com' }]])
+    const social = new Map([['v1', true]])
 
-    const result = buildCandidates(visits, profiles)
+    const result = buildCandidates(eligibleVisits('v1'), profiles, platinumIds, social, BASE_CONFIG)
 
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('v1')
     expect(result[0].name).toBe('Alice')
     expect(result[0].email).toBe('alice@example.com')
-    // 20 visits×1 + 2 halls×5 + 2 days×3 + 20×2.5 = 20 + 10 + 6 + 50 = 86
-    expect(result[0].score).toBe(86)
   })
 
-  it('excludes visitor with fewer than 10 visits on day 1', () => {
+  it('excludes visitor missing a qualifying hall', () => {
     const visits = [
-      ...Array.from({ length: 9 }, () => ({ visitor_id: 'v2', day: 1 as const, hall: 'H1', rating: null })),
-      ...Array.from({ length: 10 }, () => ({ visitor_id: 'v2', day: 2 as const, hall: 'H1', rating: null })),
+      { visitor_id: 'v2', exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 2 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 1 as const },
+      { visitor_id: 'v2', exhibitor_id: 'p3', hall: 'Jasmine Hall', day: 2 as const },
     ]
     const profiles = new Map([['v2', { name: 'Bob', email: 'bob@example.com' }]])
+    const social = new Map([['v2', true]])
 
-    const result = buildCandidates(visits, profiles)
+    const result = buildCandidates(visits, profiles, platinumIds, social, BASE_CONFIG)
     expect(result).toHaveLength(0)
   })
 
-  it('excludes visitor with fewer than 10 visits on day 2', () => {
-    const visits = [
-      ...Array.from({ length: 10 }, () => ({ visitor_id: 'v3', day: 1 as const, hall: 'H1', rating: null })),
-      ...Array.from({ length: 9 }, () => ({ visitor_id: 'v3', day: 2 as const, hall: 'H1', rating: null })),
-    ]
+  it('excludes visitor with social not complete', () => {
     const profiles = new Map([['v3', { name: 'Carol', email: 'carol@example.com' }]])
+    const social = new Map([['v3', false]])
 
-    const result = buildCandidates(visits, profiles)
+    const result = buildCandidates(eligibleVisits('v3'), profiles, platinumIds, social, BASE_CONFIG)
     expect(result).toHaveLength(0)
   })
 
   it('includes eligible and excludes ineligible from mixed input', () => {
     const visits = [
-      ...Array.from({ length: 10 }, () => ({ visitor_id: 'eligible', day: 1 as const, hall: 'H1', rating: 4 })),
-      ...Array.from({ length: 10 }, () => ({ visitor_id: 'eligible', day: 2 as const, hall: 'H1', rating: 4 })),
-      ...Array.from({ length: 5 }, () => ({ visitor_id: 'ineligible', day: 1 as const, hall: 'H1', rating: null })),
-      ...Array.from({ length: 10 }, () => ({ visitor_id: 'ineligible', day: 2 as const, hall: 'H1', rating: null })),
+      ...eligibleVisits('eligible'),
+      { visitor_id: 'ineligible', exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
     ]
     const profiles = new Map([
       ['eligible', { name: 'Eligible User', email: 'e@example.com' }],
       ['ineligible', { name: 'Ineligible User', email: 'i@example.com' }],
     ])
+    const social = new Map([['eligible', true], ['ineligible', true]])
 
-    const result = buildCandidates(visits, profiles)
+    const result = buildCandidates(visits, profiles, platinumIds, social, BASE_CONFIG)
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('eligible')
-    // 20 visits×1 + 1 hall×5 + 2 days×3 + 20×4 rating = 20 + 5 + 6 + 80 = 111
-    expect(result[0].score).toBe(111)
   })
 
   it('excludes visitors with no profile entry', () => {
-    const visits = [
-      ...day1Visits(10),
-      ...day2Visits(10),
-    ]
     const profiles = new Map<string, { name: string; email: string }>()
+    const social = new Map([['v1', true]])
 
-    const result = buildCandidates(visits, profiles)
+    const result = buildCandidates(eligibleVisits('v1'), profiles, platinumIds, social, BASE_CONFIG)
     expect(result).toHaveLength(0)
   })
 })
