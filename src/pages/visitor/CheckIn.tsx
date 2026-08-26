@@ -7,6 +7,7 @@ import { verifyPin } from '../../lib/pins'
 import { getCurrentEventDay } from '../../lib/eventDay'
 import NumPad from '../../components/NumPad'
 import StarRating from '../../components/StarRating'
+import SocialFooter from '../../components/SocialFooter'
 
 type Step = 'pin' | 'rating' | 'confirmation'
 
@@ -95,11 +96,12 @@ export default function CheckIn() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-6">
+    <div className="min-h-screen bg-white p-6 pb-20">
       <button onClick={() => navigate(-1)} className="text-primary text-sm mb-6">← Back</button>
       <h2 className="text-xl font-bold text-gray-800 mb-2">Enter Exhibitor PIN</h2>
       <p className="text-sm text-gray-500 mb-8">Ask the exhibitor to enter their 4-digit PIN</p>
       <NumPad value={pin} onChange={setPin} onConfirm={handleConfirmPin} error={error} disabled={confirming} />
+      <SocialFooter />
     </div>
   )
 }
