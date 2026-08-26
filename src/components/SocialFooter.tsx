@@ -4,10 +4,10 @@ import { supabase, type Profile } from '../lib/supabase'
 type Channel = 'linkedin' | 'instagram' | 'facebook' | 'youtube'
 
 const CHANNELS: Array<{ key: Channel; label: string; url: string }> = [
-  { key: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/infocomm-india' },
-  { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/infocommindia' },
+  { key: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/infocommindia' },
+  { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/infocommindia_/' },
   { key: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/InfoCommIndia' },
-  { key: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@InfoCommIndia' },
+  { key: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/channel/UCqyR0kBYQIqu6xpcze3NQlw' },
 ]
 
 function channelKey(key: Channel): keyof Profile {

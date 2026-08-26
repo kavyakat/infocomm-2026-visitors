@@ -37,8 +37,12 @@ export interface ExcelSheet {
 export function downloadExcel(filename: string, sheets: ExcelSheet[]): void {
   import('xlsx').then(XLSX => {
     const wb = XLSX.utils.book_new()
-    for (const sheet of sheets) {
+    for (let i = 0; i < sheets.length; i++) {
+      const sheet = sheets[i]
       const ws = XLSX.utils.json_to_sheet(sheet.rows)
+      if (ws['!ref'] && sheet.rows.length > 0) {
+        ws['!tables'] = [{ ref: ws['!ref'], name: `Table${i + 1}`, headerRow: true }]
+      }
       XLSX.utils.book_append_sheet(wb, ws, sheet.name)
     }
     XLSX.writeFile(wb, filename)

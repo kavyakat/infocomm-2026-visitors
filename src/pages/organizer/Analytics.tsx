@@ -89,13 +89,13 @@ export default function Analytics() {
         {
           name: 'Qualified Visitors',
           rows: stats.qualRows.filter(r => r.qualified).map(r => ({
-            name: r.name,
-            company: r.company,
-            days_visited: r.days,
-            halls_covered: r.halls,
-            platinum_visits: r.platinum,
-            social_complete: r.social ? 'Yes' : 'No',
-            is_qualified: 'Yes',
+            'Name': r.name,
+            'Company': r.company,
+            'Days Visited': r.days,
+            'Halls Covered': r.halls,
+            'Platinum Visits': r.platinum,
+            'Social Complete': r.social ? 'Yes' : 'No',
+            'Qualified': 'Yes',
           })),
         },
       ])
@@ -243,17 +243,17 @@ export default function Analytics() {
         const visitorProfile = profileMap.get(v.visitor_id as string)
         const isQualified = qualRows.find(r => r.visitor_id === v.visitor_id)?.qualified ?? false
         return {
-          visitor_name: profile?.name ?? '',
-          visitor_email: profile?.email ?? '',
-          company_name: visitorProfile?.company_name ?? '',
-          designation: visitorProfile?.designation ?? '',
-          exhibitor_name: exhibitor?.name ?? '',
-          booth_number: exhibitor?.booth_number ?? '',
-          hall: exhibitor?.hall ?? '',
-          day: v.day,
-          visited_at: v.visited_at,
-          rating: v.rating,
-          is_qualified: isQualified ? 'Yes' : 'No',
+          'Visitor Name': profile?.name ?? '',
+          'Email': profile?.email ?? '',
+          'Company': visitorProfile?.company_name ?? '',
+          'Designation': visitorProfile?.designation ?? '',
+          'Exhibitor': exhibitor?.name ?? '',
+          'Booth': exhibitor?.booth_number ?? '',
+          'Hall': exhibitor?.hall ?? '',
+          'Day': v.day,
+          'Visited At': v.visited_at,
+          'Rating': v.rating,
+          'Qualified': isQualified ? 'Yes' : 'No',
         }
       })
 
