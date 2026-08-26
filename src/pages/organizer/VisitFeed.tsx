@@ -93,6 +93,7 @@ export default function VisitFeed() {
           <Link to="/organizer/feed" className="underline">Feed</Link>
           <Link to="/organizer/analytics" className="hover:underline">Analytics</Link>
           <Link to="/organizer/draw" className="hover:underline">Lucky Draw</Link>
+          <Link to="/organizer/settings" className="hover:underline">Settings</Link>
           <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
           <button onClick={signOut} className="bg-white text-primary font-semibold px-3 py-1 rounded">Sign Out</button>
         </div>

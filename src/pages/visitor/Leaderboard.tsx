@@ -64,7 +64,7 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-primary text-white px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/')} className="text-white opacity-80 hover:opacity-100 text-sm">← Back</button>
+        <button onClick={() => navigate(-1)} className="text-white opacity-80 hover:opacity-100 text-sm">← Back</button>
         <h1 className="text-xl font-bold">Leaderboard</h1>
       </header>
 
