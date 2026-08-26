@@ -11,6 +11,12 @@ export type Profile = {
   email: string
   mobile: string
   role: 'visitor' | 'organizer'
+  company_name: string
+  designation: string
+  social_linkedin: boolean
+  social_instagram: boolean
+  social_facebook: boolean
+  social_youtube: boolean
 }
 
 export type Exhibitor = {
@@ -19,6 +25,7 @@ export type Exhibitor = {
   booth_number: string
   hall: string
   pin: string
+  is_platinum: boolean
   created_at: string
 }
 

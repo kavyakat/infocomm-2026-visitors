@@ -29,6 +29,7 @@ export function useExhibitors() {
             booth_number: e.booth_number,
             hall: e.hall,
             pin_hash: await hashPin(e.pin),
+            is_platinum: e.is_platinum ?? false,
           }))
         )
 

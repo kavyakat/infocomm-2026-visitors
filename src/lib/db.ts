@@ -6,6 +6,7 @@ export interface LocalExhibitor {
   booth_number: string
   hall: string
   pin_hash: string
+  is_platinum: boolean
 }
 
 export interface LocalVisit {
@@ -27,6 +28,14 @@ class AppDB extends Dexie {
     this.version(1).stores({
       exhibitors: 'id, hall',
       visits: 'id, visitor_id, exhibitor_id, synced',
+    })
+    this.version(2).stores({
+      exhibitors: 'id, hall',
+      visits: 'id, visitor_id, exhibitor_id, synced',
+    }).upgrade(tx => {
+      return tx.table('exhibitors').toCollection().modify(e => {
+        if (e.is_platinum === undefined) e.is_platinum = false
+      })
     })
   }
 }

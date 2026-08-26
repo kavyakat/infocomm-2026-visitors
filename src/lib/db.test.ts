@@ -9,7 +9,7 @@ beforeEach(async () => {
 describe('db', () => {
   it('stores and retrieves an exhibitor', async () => {
     await db.exhibitors.put({
-      id: 'e1', name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1', pin_hash: 'abc123'
+      id: 'e1', name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1', pin_hash: 'abc123', is_platinum: false
     })
     const found = await db.exhibitors.get('e1')
     expect(found?.name).toBe('ABSEN')
