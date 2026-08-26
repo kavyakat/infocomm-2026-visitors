@@ -9,8 +9,8 @@ describe('parseExhibitorCsv', () => {
     const csv = 'name,booth_number,hall\nABSEN,TF10,Hall 1\nSamsung,TF20,Hall 2'
     const rows = parseExhibitorCsv(csv)
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toEqual({ name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1' })
-    expect(rows[1]).toEqual({ name: 'Samsung', booth_number: 'TF20', hall: 'Hall 2' })
+    expect(rows[0]).toEqual({ name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1', is_platinum: false })
+    expect(rows[1]).toEqual({ name: 'Samsung', booth_number: 'TF20', hall: 'Hall 2', is_platinum: false })
   })
 
   it('skips rows missing required fields', () => {
@@ -23,12 +23,21 @@ describe('parseExhibitorCsv', () => {
   it('trims whitespace from fields', () => {
     const csv = 'name,booth_number,hall\n ABSEN , TF10 , Hall 1 '
     const rows = parseExhibitorCsv(csv)
-    expect(rows[0]).toEqual({ name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1' })
+    expect(rows[0]).toEqual({ name: 'ABSEN', booth_number: 'TF10', hall: 'Hall 1', is_platinum: false })
   })
 
   it('returns empty array when only header is present', () => {
     const csv = 'name,booth_number,hall'
     expect(parseExhibitorCsv(csv)).toHaveLength(0)
+  })
+
+  it('parses is_platinum column (true and 1 map to true; false and 0 map to false)', () => {
+    const csv = 'name,booth_number,hall,is_platinum\nBenQ,A1,Jasmine Hall,true\nCrestron,A2,Pavilion Hall,1\nEpson,A3,Jasmine Hall,false\nHarman,A4,Pavilion Hall,0'
+    const rows = parseExhibitorCsv(csv)
+    expect(rows[0].is_platinum).toBe(true)
+    expect(rows[1].is_platinum).toBe(true)
+    expect(rows[2].is_platinum).toBe(false)
+    expect(rows[3].is_platinum).toBe(false)
   })
 })
 
