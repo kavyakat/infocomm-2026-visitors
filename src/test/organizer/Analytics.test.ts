@@ -8,14 +8,14 @@ const platinumIds = new Set(['p1', 'p2', 'p3'])
 describe('eligibleCount', () => {
   it('counts eligible visitors using checkEligibility rules', () => {
     const eligibleVisits = [
-      { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const },
-      { exhibitor_id: 'e2', hall: 'Pavilion Halls', day: 2 as const },
-      { exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 as const },
-      { exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 2 as const },
-      { exhibitor_id: 'p3', hall: 'Pavilion Halls', day: 1 as const },
+      { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
+      { exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 as const },
+      { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 as const },
+      { exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 as const },
+      { exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 as const },
     ]
     const ineligibleVisits = [
-      { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const },
+      { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const },
     ]
 
     const visitsByVisitor = new Map([
@@ -28,7 +28,7 @@ describe('eligibleCount', () => {
   })
 
   it('returns 0 when no visitors meet all criteria', () => {
-    const visitsByVisitor = new Map([['v1', [{ exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 as const }]]])
+    const visitsByVisitor = new Map([['v1', [{ exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 as const }]]])
     const social = new Map([['v1', false]])
 
     expect(eligibleCount(visitsByVisitor, platinumIds, social, CONFIG)).toBe(0)

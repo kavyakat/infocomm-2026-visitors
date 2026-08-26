@@ -12,11 +12,11 @@ const platinumIds = new Set(['p1', 'p2', 'p3', 'p4'])
 function makeInput(overrides: Partial<EligibilityInput> = {}): EligibilityInput {
   return {
     visits: [
-      { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 },
-      { exhibitor_id: 'e2', hall: 'Pavilion Halls', day: 2 },
-      { exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 },
-      { exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 2 },
-      { exhibitor_id: 'p3', hall: 'Pavilion Halls', day: 1 },
+      { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 },
+      { exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 },
+      { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 },
+      { exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 },
+      { exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 },
     ],
     platinumIds,
     socialComplete: true,
@@ -37,10 +37,10 @@ describe('checkEligibility', () => {
   it('fails when not enough distinct days', () => {
     const input = makeInput({
       visits: [
-        { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'p3', hall: 'Pavilion Halls', day: 1 },
+        { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 },
       ],
     })
     const result = checkEligibility(input)
@@ -52,40 +52,40 @@ describe('checkEligibility', () => {
   it('fails when Jasmine Hall not visited', () => {
     const input = makeInput({
       visits: [
-        { exhibitor_id: 'e1', hall: 'Pavilion Halls', day: 1 },
-        { exhibitor_id: 'e2', hall: 'Pavilion Halls', day: 2 },
-        { exhibitor_id: 'p1', hall: 'Pavilion Halls', day: 1 },
-        { exhibitor_id: 'p2', hall: 'Pavilion Halls', day: 2 },
-        { exhibitor_id: 'p3', hall: 'Pavilion Halls', day: 1 },
+        { exhibitor_id: 'e1', hall: 'Pavilion Hall', day: 1 },
+        { exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 },
+        { exhibitor_id: 'p1', hall: 'Pavilion Hall', day: 1 },
+        { exhibitor_id: 'p2', hall: 'Pavilion Hall', day: 2 },
+        { exhibitor_id: 'p3', hall: 'Pavilion Hall', day: 1 },
       ],
     })
     const result = checkEligibility(input)
     expect(result.eligible).toBe(false)
-    expect(result.reasons.some(r => r.includes('Jasmine Halls'))).toBe(true)
+    expect(result.reasons.some(r => r.includes('Jasmine Hall'))).toBe(true)
   })
 
   it('fails when Pavilion Hall not visited', () => {
     const input = makeInput({
       visits: [
-        { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'e2', hall: 'Jasmine Halls', day: 2 },
-        { exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'p2', hall: 'Jasmine Halls', day: 2 },
-        { exhibitor_id: 'p3', hall: 'Jasmine Halls', day: 1 },
+        { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'e2', hall: 'Jasmine Hall', day: 2 },
+        { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'p2', hall: 'Jasmine Hall', day: 2 },
+        { exhibitor_id: 'p3', hall: 'Jasmine Hall', day: 1 },
       ],
     })
     const result = checkEligibility(input)
     expect(result.eligible).toBe(false)
-    expect(result.reasons.some(r => r.includes('Pavilion Halls'))).toBe(true)
+    expect(result.reasons.some(r => r.includes('Pavilion Hall'))).toBe(true)
   })
 
   it('fails when not enough platinum visits', () => {
     const input = makeInput({
       visits: [
-        { exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'e2', hall: 'Pavilion Halls', day: 2 },
-        { exhibitor_id: 'p1', hall: 'Jasmine Halls', day: 1 },
-        { exhibitor_id: 'p2', hall: 'Pavilion Halls', day: 2 },
+        { exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'e2', hall: 'Pavilion Hall', day: 2 },
+        { exhibitor_id: 'p1', hall: 'Jasmine Hall', day: 1 },
+        { exhibitor_id: 'p2', hall: 'Pavilion Hall', day: 2 },
       ],
     })
     const result = checkEligibility(input)
@@ -116,7 +116,7 @@ describe('checkEligibility', () => {
 
   it('collects all failure reasons', () => {
     const input = makeInput({
-      visits: [{ exhibitor_id: 'e1', hall: 'Jasmine Halls', day: 1 }],
+      visits: [{ exhibitor_id: 'e1', hall: 'Jasmine Hall', day: 1 }],
       socialComplete: false,
     })
     const result = checkEligibility(input)
@@ -126,8 +126,8 @@ describe('checkEligibility', () => {
 
   it('returns correct hallsCovered', () => {
     const result = checkEligibility(makeInput())
-    expect(result.hallsCovered).toContain('Jasmine Halls')
-    expect(result.hallsCovered).toContain('Pavilion Halls')
+    expect(result.hallsCovered).toContain('Jasmine Hall')
+    expect(result.hallsCovered).toContain('Pavilion Hall')
   })
 })
 

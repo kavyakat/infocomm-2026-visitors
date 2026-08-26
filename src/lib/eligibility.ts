@@ -32,11 +32,11 @@ export function checkEligibility(input: EligibilityInput): EligibilityResult {
   if (distinctDays < config.minQualifyingDays) {
     reasons.push(`Must attend at least ${config.minQualifyingDays} day(s) (visited ${distinctDays})`)
   }
-  if (!hallsCovered.includes('Jasmine Halls')) {
-    reasons.push('Must visit Jasmine Halls')
+  if (!hallsCovered.includes('Jasmine Hall')) {
+    reasons.push('Must visit Jasmine Hall')
   }
-  if (!hallsCovered.includes('Pavilion Halls')) {
-    reasons.push('Must visit Pavilion Halls')
+  if (!hallsCovered.includes('Pavilion Hall')) {
+    reasons.push('Must visit Pavilion Hall')
   }
   if (platinumVisits < config.minPlatinumVisits) {
     reasons.push(`Must visit ${config.minPlatinumVisits} Platinum Partner(s) (visited ${platinumVisits})`)
