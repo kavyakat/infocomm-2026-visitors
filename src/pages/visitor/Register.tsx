@@ -17,8 +17,8 @@ export default function Register() {
     setLoading(true)
     setError('')
 
-    if (mobile.length < 6) {
-      setError('Mobile number must be at least 6 digits')
+    if (mobile.length < 6 || !/^\d+$/.test(mobile)) {
+      setError('Mobile number must be at least 6 digits and contain only numbers')
       setLoading(false)
       return
     }
@@ -79,8 +79,9 @@ export default function Register() {
               type="tel"
               required
               minLength={6}
+              pattern="[0-9]+"
               value={mobile}
-              onChange={e => setMobile(e.target.value)}
+              onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
