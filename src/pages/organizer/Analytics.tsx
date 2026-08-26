@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { toCsv, downloadCsv } from '../../lib/export'
+import { downloadExcel } from '../../lib/export'
 import {
   eligibleCount,
   buildHallDistribution,
@@ -10,7 +10,18 @@ import {
   buildTopExhibitors,
   buildEngagementDist,
 } from '../../lib/analytics'
-import { type EligibilityConfig } from '../../lib/eligibility'
+import { checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
+
+type QualRow = {
+  visitor_id: string
+  name: string
+  company: string
+  days: number
+  halls: string
+  platinum: number
+  social: boolean
+  qualified: boolean
+}
 
 type Stats = {
   totalVisits: number
@@ -24,6 +35,8 @@ type Stats = {
   topExhibitors: Array<{ name: string; booth: string; count: number }>
   ratingDist: Array<{ label: string; count: number }>
   engagementDist: Array<{ bucket: string; count: number }>
+  qualRows: QualRow[]
+  allVisitRows: Array<Record<string, unknown>>
 }
 
 function StatCard({ value, label }: { value: number | string; label: string }) {
@@ -48,17 +61,6 @@ function HBar({ value, max, label, right }: { value: number; max: number; label:
   )
 }
 
-const EXPORT_COLUMNS = [
-  'visitor_name',
-  'visitor_email',
-  'exhibitor_name',
-  'booth_number',
-  'hall',
-  'day',
-  'visited_at',
-  'rating',
-]
-
 function hourLabel(hour: number): string {
   if (hour === 0) return '12am'
   if (hour < 12) return `${hour}am`
@@ -72,34 +74,31 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [togglingLeaderboard, setTogglingLeaderboard] = useState(false)
+  const [qualFilter, setQualFilter] = useState<'all' | 'qualified' | 'not-qualified'>('all')
   const [error, setError] = useState('')
 
   async function handleExport() {
+    if (!stats) return
     setExporting(true)
     try {
-      const { data, error: fetchError } = await supabase
-        .from('visits')
-        .select('*, profiles(name, email), exhibitors(name, booth_number, hall)')
-
-      if (fetchError) { setError(fetchError.message); return }
-
-      const rows = (data ?? []).map((v: Record<string, unknown>) => {
-        const profile = v.profiles as Record<string, unknown> | null
-        const exhibitor = v.exhibitors as Record<string, unknown> | null
-        return {
-          visitor_name: profile?.name ?? '',
-          visitor_email: profile?.email ?? '',
-          exhibitor_name: exhibitor?.name ?? '',
-          booth_number: exhibitor?.booth_number ?? '',
-          hall: exhibitor?.hall ?? '',
-          day: v.day,
-          visited_at: v.visited_at,
-          rating: v.rating,
-        }
-      })
-
-    const csv = toCsv(rows, EXPORT_COLUMNS)
-    downloadCsv('visits.csv', csv)
+      downloadExcel('infocomm-visits.xlsx', [
+        {
+          name: 'All Visits',
+          rows: stats.allVisitRows,
+        },
+        {
+          name: 'Qualified Visitors',
+          rows: stats.qualRows.filter(r => r.qualified).map(r => ({
+            name: r.name,
+            company: r.company,
+            days_visited: r.days,
+            halls_covered: r.halls,
+            platinum_visits: r.platinum,
+            social_complete: r.social ? 'Yes' : 'No',
+            is_qualified: 'Yes',
+          })),
+        },
+      ])
     } finally {
       setExporting(false)
     }
@@ -122,10 +121,12 @@ export default function Analytics() {
 
   useEffect(() => {
     async function load() {
-      const [visitsRes, exhibitorsRes, settingsRes] = await Promise.all([
+      const [visitsRes, exhibitorsRes, settingsRes, profilesRes, allVisitsRes] = await Promise.all([
         supabase.from('visits').select('visitor_id, day, exhibitor_id, visited_at, rating'),
         supabase.from('exhibitors').select('id, hall, name, booth_number, is_platinum'),
         supabase.from('settings').select('key, value').in('key', ['leaderboard_visible', 'min_qualifying_days', 'min_platinum_visits', 'min_total_checkins']),
+        supabase.from('profiles').select('id, name, company_name, designation, email, mobile, social_linkedin, social_instagram, social_facebook, social_youtube').eq('role', 'visitor'),
+        supabase.from('visits').select('*, profiles(name, email), exhibitors(name, booth_number, hall)'),
       ])
 
       if (visitsRes.error) { setError(visitsRes.error.message); setLoading(false); return }
@@ -171,7 +172,17 @@ export default function Analytics() {
         })
       }
 
-      const socialByVisitor = new Map<string, boolean>()
+      type ProfileRow = {
+        id: string; name: string; company_name: string; designation: string
+        email: string; mobile: string
+        social_linkedin: boolean; social_instagram: boolean; social_facebook: boolean; social_youtube: boolean
+      }
+      const allProfiles = (profilesRes.data ?? []) as ProfileRow[]
+      const socialByVisitor = new Map(allProfiles.map(p => [
+        p.id,
+        p.social_linkedin && p.social_instagram && p.social_facebook && p.social_youtube,
+      ]))
+
       const eligible = eligibleCount(visitsByVisitor, platinumIds, socialByVisitor, config)
       const hallDist = buildHallDistribution(allExhibitors, allVisits)
 
@@ -209,6 +220,43 @@ export default function Analytics() {
       }
       const engagementDist = buildEngagementDist(visitorVisitCounts)
 
+      const profileMap = new Map(allProfiles.map(p => [p.id, p]))
+      const qualRows: QualRow[] = allProfiles.map(p => {
+        const visits = visitsByVisitor.get(p.id) ?? []
+        const social = socialByVisitor.get(p.id) ?? false
+        const result = checkEligibility({ visits, platinumIds, socialComplete: social, config })
+        return {
+          visitor_id: p.id,
+          name: p.name,
+          company: p.company_name,
+          days: result.daysVisited,
+          halls: result.hallsCovered.join(', '),
+          platinum: result.platinumVisits,
+          social,
+          qualified: result.eligible,
+        }
+      })
+
+      const allVisitRows = (allVisitsRes.data ?? []).map((v: Record<string, unknown>) => {
+        const profile = v.profiles as Record<string, unknown> | null
+        const exhibitor = v.exhibitors as Record<string, unknown> | null
+        const visitorProfile = profileMap.get(v.visitor_id as string)
+        const isQualified = qualRows.find(r => r.visitor_id === v.visitor_id)?.qualified ?? false
+        return {
+          visitor_name: profile?.name ?? '',
+          visitor_email: profile?.email ?? '',
+          company_name: visitorProfile?.company_name ?? '',
+          designation: visitorProfile?.designation ?? '',
+          exhibitor_name: exhibitor?.name ?? '',
+          booth_number: exhibitor?.booth_number ?? '',
+          hall: exhibitor?.hall ?? '',
+          day: v.day,
+          visited_at: v.visited_at,
+          rating: v.rating,
+          is_qualified: isQualified ? 'Yes' : 'No',
+        }
+      })
+
       setStats({
         totalVisits,
         uniqueVisitors,
@@ -221,6 +269,8 @@ export default function Analytics() {
         topExhibitors,
         ratingDist,
         engagementDist,
+        qualRows,
+        allVisitRows,
       })
       setLoading(false)
     }
@@ -237,6 +287,7 @@ export default function Analytics() {
           <Link to="/organizer/feed" className="hover:underline">Feed</Link>
           <Link to="/organizer/analytics" className="underline">Analytics</Link>
           <Link to="/organizer/draw" className="hover:underline">Lucky Draw</Link>
+          <Link to="/organizer/settings" className="hover:underline">Settings</Link>
           <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
           <button onClick={signOut} className="bg-white text-primary font-semibold px-3 py-1 rounded">Sign Out</button>
         </div>
@@ -251,7 +302,7 @@ export default function Analytics() {
               disabled={exporting}
               className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {exporting ? 'Exporting…' : 'Export Visits CSV'}
+              {exporting ? 'Exporting…' : 'Export Excel'}
             </button>
           )}
         </div>
@@ -424,6 +475,59 @@ export default function Analytics() {
                   })()}
                 </div>
               </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-800">Visitor Qualification Breakdown</h2>
+                <select
+                  value={qualFilter}
+                  onChange={e => setQualFilter(e.target.value as typeof qualFilter)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                >
+                  <option value="all">All visitors</option>
+                  <option value="qualified">Qualified only</option>
+                  <option value="not-qualified">Not qualified</option>
+                </select>
+              </div>
+              {stats.qualRows.length === 0 ? (
+                <p className="text-gray-500 text-sm">No visitor data available.</p>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold text-gray-700">Name</th>
+                        <th className="text-left px-4 py-3 font-semibold text-gray-700">Company</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-700">Days</th>
+                        <th className="text-left px-4 py-3 font-semibold text-gray-700">Halls</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-700">Platinum</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-700">Social</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-700">Qualified</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {stats.qualRows
+                        .filter(r => qualFilter === 'all' || (qualFilter === 'qualified' ? r.qualified : !r.qualified))
+                        .map(r => (
+                          <tr key={r.visitor_id} className="odd:bg-primary-subtle">
+                            <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
+                            <td className="px-4 py-3 text-gray-600 text-xs">{r.company}</td>
+                            <td className="px-4 py-3 text-center text-gray-700">{r.days}</td>
+                            <td className="px-4 py-3 text-gray-600 text-xs">{r.halls || '—'}</td>
+                            <td className="px-4 py-3 text-center text-gray-700">{r.platinum}</td>
+                            <td className="px-4 py-3 text-center">{r.social ? '✓' : '—'}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.qualified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {r.qualified ? 'Yes' : 'No'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div>
