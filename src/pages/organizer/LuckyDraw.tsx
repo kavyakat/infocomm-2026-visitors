@@ -46,10 +46,6 @@ export default function LuckyDraw() {
   const [newWinnerId, setNewWinnerId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    loadWinners()
-  }, [])
-
   async function loadWinners() {
     const { data, error: err } = await supabase
       .from('lucky_draw_winners')
@@ -77,6 +73,13 @@ export default function LuckyDraw() {
       }
     }))
   }
+
+  useEffect(() => {
+    async function init() {
+      await loadWinners()
+    }
+    init()
+  }, [])
 
   async function buildPool() {
     setBuilding(true)
