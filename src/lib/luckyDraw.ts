@@ -1,7 +1,7 @@
 import { checkEligibility, fairDraw, type EligibilityConfig, type Candidate } from './eligibility'
 
 export type { Candidate }
-export type Winner = { prize_rank: 1 | 2 | 3; name: string; email: string }
+export type Winner = { prize_rank: number; name: string; email: string }
 
 export function buildCandidates(
   allVisits: Array<{ visitor_id: string; exhibitor_id: string; day: 1 | 2 | 3; hall: string }>,
@@ -32,11 +32,11 @@ export function buildCandidates(
   return candidates
 }
 
-export function nextPrizeRank(existingWinners: number[]): 1 | 2 | 3 | null {
-  for (const rank of [1, 2, 3] as const) {
-    if (!existingWinners.includes(rank)) return rank
-  }
-  return null
+export function nextPrizeRank(existingWinners: number[]): number {
+  const taken = new Set(existingWinners)
+  let rank = 1
+  while (taken.has(rank)) rank++
+  return rank
 }
 
 export { fairDraw }

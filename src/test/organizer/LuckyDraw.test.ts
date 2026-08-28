@@ -93,7 +93,15 @@ describe('nextPrizeRank', () => {
     expect(nextPrizeRank([1, 2])).toBe(3)
   })
 
-  it('returns null when all 3 ranks are drawn', () => {
-    expect(nextPrizeRank([1, 2, 3])).toBeNull()
+  it('returns 4 when ranks 1–3 are drawn', () => {
+    expect(nextPrizeRank([1, 2, 3])).toBe(4)
+  })
+
+  it('fills the gap when rank 2 is missing', () => {
+    expect(nextPrizeRank([1, 3])).toBe(2)
+  })
+
+  it('returns 5 when ranks 1–4 are drawn', () => {
+    expect(nextPrizeRank([1, 2, 3, 4])).toBe(5)
   })
 })

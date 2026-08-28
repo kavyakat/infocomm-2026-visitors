@@ -36,12 +36,14 @@ export default function ExhibitorList() {
   const platinumVisited = [...platinumIds].filter(id => visitedIds.has(id)).length
   const platinumMet = platinumVisited >= minPlatinum
 
-  const filtered = exhibitors.filter(e => {
-    const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.booth_number.toLowerCase().includes(search.toLowerCase())
-    const matchesHall = hallFilter ? e.hall === hallFilter : true
-    return matchesSearch && matchesHall
-  })
+  const filtered = exhibitors
+    .filter(e => {
+      const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.booth_number.toLowerCase().includes(search.toLowerCase())
+      const matchesHall = hallFilter ? e.hall === hallFilter : true
+      return matchesSearch && matchesHall
+    })
+    .sort((a, b) => Number(b.is_platinum) - Number(a.is_platinum))
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
