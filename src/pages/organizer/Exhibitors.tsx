@@ -64,14 +64,12 @@ export default function Exhibitors() {
     try {
       const existingMap = new Map(exhibitors.map(ex => [`${ex.name}|${ex.booth_number}`, ex]))
 
-      const usedPins = new Set(
-        pendingCsvRows
-          .map(row => existingMap.get(`${row.name}|${row.booth_number}`)?.pin)
-          .filter((p): p is string => p !== undefined)
-      )
+      const usedPins = new Set<string>()
       const inserts = pendingCsvRows.map(row => {
         const existing = existingMap.get(`${row.name}|${row.booth_number}`)
-        const pin = existing ? existing.pin : generatePin(usedPins)
+        const pin = (existing && !usedPins.has(existing.pin))
+          ? existing.pin
+          : generatePin(usedPins)
         usedPins.add(pin)
         const is_platinum = existing ? (existing.is_platinum || row.is_platinum) : row.is_platinum
         return { ...row, pin, is_platinum }

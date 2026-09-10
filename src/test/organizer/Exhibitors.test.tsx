@@ -81,8 +81,8 @@ describe('CSV import deduplicates PINs', () => {
     const mockFrom = vi.mocked(supabase.from)
 
     const mockEq = vi.fn().mockResolvedValue({ error: null })
-    const mockNeq = vi.fn().mockResolvedValue({ error: null })
-    const mockDelete = vi.fn(() => ({ neq: mockNeq }))
+    const mockGte = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn(() => ({ gte: mockGte }))
     const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null })
     const mockInsert = vi.fn().mockResolvedValue({ error: null })
     const mockUpdate = vi.fn(() => ({ eq: mockEq }))
@@ -119,8 +119,8 @@ describe('CSV import deduplicates PINs', () => {
     const mockFrom = vi.mocked(supabase.from)
 
     const mockEq = vi.fn().mockResolvedValue({ error: null })
-    const mockNeq = vi.fn().mockResolvedValue({ error: null })
-    const mockDelete = vi.fn(() => ({ neq: mockNeq }))
+    const mockGte = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn(() => ({ gte: mockGte }))
     const mockOrder = vi.fn().mockResolvedValue({ data: existingExhibitors, error: null })
     const mockInsert = vi.fn().mockResolvedValue({ error: null })
     const mockUpdate = vi.fn(() => ({ eq: mockEq }))
