@@ -77,7 +77,7 @@ export default function Exhibitors() {
         return { ...row, pin, is_platinum }
       })
 
-      const { error: delError } = await supabase.from('exhibitors').delete().neq('id', '')
+      const { error: delError } = await supabase.from('exhibitors').delete().gte('created_at', '1970-01-01')
       if (delError) { setImportError(delError.message); setImporting(false); return }
 
       const { error } = await supabase.from('exhibitors').insert(inserts)
