@@ -12,12 +12,14 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [siteOpen, setSiteOpen] = useState(false)
+  const [siteOpenSaving, setSiteOpenSaving] = useState(false)
 
   useEffect(() => {
     supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day'])
+      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day', 'registration_open'])
       .then(({ data }) => {
         if (!data) return
         const m = new Map(data.map(r => [r.key, r.value]))
@@ -26,8 +28,17 @@ export default function Settings() {
         setMinCheckins(Number(m.get('min_total_checkins') ?? 0))
         const d = Number(m.get('current_event_day') ?? 1)
         setEventDay((d >= 1 && d <= 3 ? d : 1) as 1 | 2 | 3)
+        setSiteOpen(m.get('registration_open') === 'true')
       })
   }, [])
+
+  async function toggleSiteOpen() {
+    const next = !siteOpen
+    setSiteOpenSaving(true)
+    const { error: err } = await supabase.from('settings').upsert([{ key: 'registration_open', value: String(next) }])
+    if (!err) setSiteOpen(next)
+    setSiteOpenSaving(false)
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -67,11 +78,32 @@ export default function Settings() {
       </nav>
 
       <div className="max-w-lg mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Draw Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+
+        <div className={`rounded-xl border-2 p-5 flex items-center justify-between gap-4 ${siteOpen ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-white'}`}>
+          <div>
+            <p className="font-semibold text-gray-900">Visitor registration</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {siteOpen
+                ? 'Site is live — visitors can register, log in, and check in.'
+                : 'Site is closed — visitors see a "coming soon" page.'}
+            </p>
+          </div>
+          <button
+            onClick={toggleSiteOpen}
+            disabled={siteOpenSaving}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${siteOpen ? 'bg-green-500' : 'bg-gray-300'}`}
+          >
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ${siteOpen ? 'translate-x-5' : 'translate-x-0'}`}
+            />
+          </button>
+        </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
         <form onSubmit={handleSave} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+          <h2 className="text-base font-semibold text-gray-800">Draw settings</h2>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Minimum qualifying days

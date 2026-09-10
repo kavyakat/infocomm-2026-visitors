@@ -81,11 +81,13 @@ describe('CSV import deduplicates PINs', () => {
     const mockFrom = vi.mocked(supabase.from)
 
     const mockEq = vi.fn().mockResolvedValue({ error: null })
+    const mockNeq = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn(() => ({ neq: mockNeq }))
     const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null })
     const mockInsert = vi.fn().mockResolvedValue({ error: null })
     const mockUpdate = vi.fn(() => ({ eq: mockEq }))
     const mockSelect = vi.fn(() => ({ order: mockOrder }))
-    mockFrom.mockReturnValue({ select: mockSelect, insert: mockInsert, update: mockUpdate } as never)
+    mockFrom.mockReturnValue({ select: mockSelect, insert: mockInsert, update: mockUpdate, delete: mockDelete } as never)
 
     const { default: Exhibitors } = await import('../../pages/organizer/Exhibitors')
     const { container } = render(<Exhibitors />)
@@ -98,6 +100,9 @@ describe('CSV import deduplicates PINs', () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [file] } })
 
+    await waitFor(() => expect(screen.getByText('Replace list')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Replace list'))
+
     await waitFor(() => expect(mockInsert).toHaveBeenCalled())
 
     const [insertedRows] = mockInsert.mock.calls[0] as [Array<{ pin: string }>]
@@ -107,18 +112,20 @@ describe('CSV import deduplicates PINs', () => {
 
   it('does not reuse PINs already held by existing exhibitors', async () => {
     const existingExhibitors = [
-      { id: 'e1', name: 'ExistCo', booth_number: 'A1', hall: 'Hall 1', pin: '1234', created_at: '' },
+      { id: 'e1', name: 'ExistCo', booth_number: 'A1', hall: 'Hall 1', pin: '1234', is_platinum: false, created_at: '' },
     ]
 
     const { supabase } = await import('../../lib/supabase')
     const mockFrom = vi.mocked(supabase.from)
 
     const mockEq = vi.fn().mockResolvedValue({ error: null })
+    const mockNeq = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn(() => ({ neq: mockNeq }))
     const mockOrder = vi.fn().mockResolvedValue({ data: existingExhibitors, error: null })
     const mockInsert = vi.fn().mockResolvedValue({ error: null })
     const mockUpdate = vi.fn(() => ({ eq: mockEq }))
     const mockSelect = vi.fn(() => ({ order: mockOrder }))
-    mockFrom.mockReturnValue({ select: mockSelect, insert: mockInsert, update: mockUpdate } as never)
+    mockFrom.mockReturnValue({ select: mockSelect, insert: mockInsert, update: mockUpdate, delete: mockDelete } as never)
 
     const { default: Exhibitors } = await import('../../pages/organizer/Exhibitors')
     const { container } = render(<Exhibitors />)
@@ -133,6 +140,9 @@ describe('CSV import deduplicates PINs', () => {
 
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() => expect(screen.getByText('Replace list')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Replace list'))
 
     await waitFor(() => expect(mockInsert).toHaveBeenCalled())
 

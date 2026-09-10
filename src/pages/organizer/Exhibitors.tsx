@@ -24,6 +24,7 @@ export default function Exhibitors() {
   const [editSaving, setEditSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [hallFilter, setHallFilter] = useState('')
+  const [pendingCsvRows, setPendingCsvRows] = useState<Array<{ name: string; booth_number: string; hall: string; is_platinum: boolean }> | null>(null)
 
   async function loadExhibitors() {
     const { data } = await supabase.from('exhibitors').select('*').order('name')
@@ -40,31 +41,52 @@ export default function Exhibitors() {
     init()
   }, [])
 
-  async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleCsvPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setImporting(true)
     setImportError('')
     try {
       const text = await file.text()
       const rows = parseExhibitorCsv(text)
-      if (rows.length === 0) { setImportError('No valid rows found in CSV'); setImporting(false); return }
+      if (rows.length === 0) { setImportError('No valid rows found in CSV'); return }
+      setPendingCsvRows(rows)
+    } catch {
+      setImportError('Failed to parse CSV')
+    }
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
-      const existingPins = new Set(exhibitors.map(ex => ex.pin))
-      const inserts = rows.map(row => {
-        const pin = generatePin(existingPins)
-        existingPins.add(pin)
-        return { ...row, pin }
+  async function confirmCsvImport() {
+    if (!pendingCsvRows) return
+    setImporting(true)
+    setImportError('')
+    setPendingCsvRows(null)
+    try {
+      const existingMap = new Map(exhibitors.map(ex => [ex.booth_number, ex]))
+
+      const usedPins = new Set(
+        pendingCsvRows
+          .map(row => existingMap.get(row.booth_number)?.pin)
+          .filter((p): p is string => p !== undefined)
+      )
+      const inserts = pendingCsvRows.map(row => {
+        const existing = existingMap.get(row.booth_number)
+        const pin = existing ? existing.pin : generatePin(usedPins)
+        usedPins.add(pin)
+        const is_platinum = existing ? (existing.is_platinum || row.is_platinum) : row.is_platinum
+        return { ...row, pin, is_platinum }
       })
+
+      const { error: delError } = await supabase.from('exhibitors').delete().neq('id', '')
+      if (delError) { setImportError(delError.message); setImporting(false); return }
 
       const { error } = await supabase.from('exhibitors').insert(inserts)
       if (error) { setImportError(error.message); setImporting(false); return }
       await loadExhibitors()
     } catch {
-      setImportError('Failed to parse CSV')
+      setImportError('Failed to import CSV')
     }
     setImporting(false)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function handleAdd() {
@@ -187,7 +209,7 @@ export default function Exhibitors() {
                 type="file"
                 accept=".csv"
                 className="hidden"
-                onChange={handleCsvImport}
+                onChange={handleCsvPick}
                 disabled={importing}
               />
             </label>
@@ -392,6 +414,32 @@ export default function Exhibitors() {
           </div>
         )}
       </div>
+
+      {pendingCsvRows && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full space-y-4">
+            <h2 className="text-base font-semibold text-gray-900">Replace exhibitor list?</h2>
+            <p className="text-sm text-gray-600">
+              This will <span className="font-medium text-red-600">delete all {exhibitors.length} current exhibitor{exhibitors.length !== 1 ? 's' : ''}</span> and replace them with the <span className="font-medium">{pendingCsvRows.length} row{pendingCsvRows.length !== 1 ? 's' : ''}</span> from your CSV.
+            </p>
+            <p className="text-xs text-gray-500">Platinum status and PINs are preserved for exhibitors whose booth number matches an existing one.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setPendingCsvRows(null); if (fileRef.current) fileRef.current.value = '' }}
+                className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCsvImport}
+                className="text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg px-4 py-2 font-medium"
+              >
+                Replace list
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="print-grid">
         {exhibitors.map(ex => (

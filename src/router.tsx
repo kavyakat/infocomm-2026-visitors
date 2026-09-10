@@ -13,14 +13,15 @@ import LuckyDraw from './pages/organizer/LuckyDraw'
 import Settings from './pages/organizer/Settings'
 import VisitorRoute from './guards/VisitorRoute'
 import OrganizerRoute from './guards/OrganizerRoute'
+import SiteGate from './guards/SiteGate'
 
 export const router = createBrowserRouter([
-  { path: '/register', element: <Register /> },
-  { path: '/login', element: <Login /> },
-  { path: '/', element: <VisitorRoute><ExhibitorList /></VisitorRoute> },
-  { path: '/check-in/:exhibitorId', element: <VisitorRoute><CheckIn /></VisitorRoute> },
-  { path: '/leaderboard', element: <Leaderboard /> },
-  { path: '/my-eligibility', element: <VisitorRoute><MyEligibility /></VisitorRoute> },
+  { path: '/register', element: <SiteGate><Register /></SiteGate> },
+  { path: '/login', element: <SiteGate><Login /></SiteGate> },
+  { path: '/', element: <SiteGate><VisitorRoute><ExhibitorList /></VisitorRoute></SiteGate> },
+  { path: '/check-in/:exhibitorId', element: <SiteGate><VisitorRoute><CheckIn /></VisitorRoute></SiteGate> },
+  { path: '/leaderboard', element: <SiteGate><Leaderboard /></SiteGate> },
+  { path: '/my-eligibility', element: <SiteGate><VisitorRoute><MyEligibility /></VisitorRoute></SiteGate> },
   { path: '/organizer/login', element: <OrganizerLogin /> },
   { path: '/organizer', element: <OrganizerRoute><Exhibitors /></OrganizerRoute> },
   { path: '/organizer/feed', element: <OrganizerRoute><VisitFeed /></OrganizerRoute> },
