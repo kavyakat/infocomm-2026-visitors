@@ -162,16 +162,47 @@ export default function Exhibitors() {
           .print-grid {
             display: grid !important;
             grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
+            grid-auto-rows: 140px;
+            gap: 0.75rem;
             padding: 1rem;
           }
           .pin-card {
             border: 2px solid #000;
-            padding: 1rem;
+            padding: 0.75rem;
             text-align: center;
             page-break-inside: avoid;
+            height: 140px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
           }
-          .pin-card .pin { font-size: 2.5rem; font-weight: 700; letter-spacing: 0.25rem; }
+          .pin-card .card-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+          }
+          .pin-card .card-sub {
+            font-size: 0.75rem;
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            margin-top: 0.15rem;
+          }
+          .pin-card .pin {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: 0.3rem;
+            margin-top: 0.4rem;
+            line-height: 1;
+          }
         }
         @media not print {
           .print-grid { display: none; }
@@ -461,8 +492,8 @@ export default function Exhibitors() {
       <div className="print-grid">
         {exhibitors.map(ex => (
           <div key={ex.id} className="pin-card">
-            <div style={{ fontWeight: 600, fontSize: '1rem' }}>{ex.name}</div>
-            <div style={{ fontSize: '0.85rem', color: '#555' }}>{ex.booth_number} · {ex.hall}</div>
+            <div className="card-name">{ex.name}</div>
+            <div className="card-sub">{ex.booth_number} · {ex.hall}</div>
             <div className="pin">{ex.pin}</div>
           </div>
         ))}
