@@ -258,9 +258,10 @@ export default function LuckyDraw() {
       .update({ redrawn: true })
       .eq('id', winner.id)
     if (updateErr) { setError(updateErr.message); return }
-
     setWinners(prev => prev.map(w => w.id === winner.id ? { ...w, redrawn: true } : w))
-    setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
+    if (poolBuilt) {
+      setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
+    }
   }
 
   async function resetDraw() {
@@ -530,37 +531,38 @@ export default function LuckyDraw() {
               Export
             </button>
           )}
-          {winners.length > 0 && !resetConfirm && (
-            <button
-              onClick={() => setResetConfirm(true)}
-              className="px-4 py-3 border border-red-300 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50"
-            >
-              Reset Draw
-            </button>
-          )}
-          {resetConfirm && (
-            <div className="w-full flex items-center justify-center gap-3 py-2 px-4 bg-red-50 border border-red-200 rounded-xl">
-              <span className="text-sm text-red-700 font-medium">Delete all winners and restart?</span>
-              <button
-                onClick={resetDraw}
-                className="text-sm font-semibold px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Yes, Reset
-              </button>
-              <button
-                onClick={() => setResetConfirm(false)}
-                className="text-sm font-semibold px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Winners list */}
         {winners.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
+              {!resetConfirm ? (
+                <button
+                  onClick={() => setResetConfirm(true)}
+                  className="text-xs text-red-500 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 font-medium"
+                >
+                  Reset all winners
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-red-700 font-medium">Delete all and restart?</span>
+                  <button
+                    onClick={resetDraw}
+                    className="text-xs font-semibold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Yes, reset
+                  </button>
+                  <button
+                    onClick={() => setResetConfirm(false)}
+                    className="text-xs font-semibold px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
             {winners.map(w => {
               const isNew = w.id === newWinnerId
               return (
@@ -578,7 +580,7 @@ export default function LuckyDraw() {
                     </div>
                     <div className="text-right flex flex-col items-end gap-2">
                       <div className="text-xs text-gray-400">{rankLabel(w.prize_rank)}</div>
-                      {!w.redrawn && poolBuilt && (
+                      {!w.redrawn && (
                         <button
                           onClick={() => redraw(w)}
                           className="text-xs text-red-500 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50"
