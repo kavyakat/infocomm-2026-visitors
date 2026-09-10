@@ -10,7 +10,10 @@ export default function SiteGate({ children }: { children: React.ReactNode }) {
       .select('value')
       .eq('key', 'registration_open')
       .maybeSingle()
-      .then(({ data }) => setOpen(data?.value === 'true'))
+      .then(({ data, error }) => {
+        if (error) console.error('[SiteGate] could not read settings:', error.message)
+        setOpen(error ? true : data?.value === 'true')
+      })
   }, [])
 
   if (open === null) {
