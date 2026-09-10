@@ -147,6 +147,15 @@ export default function Exhibitors() {
   }
 
   const halls = Array.from(new Set(exhibitors.map(ex => ex.hall))).sort()
+
+  function cardNameSize(name: string): string {
+    const len = name.length
+    if (len <= 18) return '0.9rem'
+    if (len <= 26) return '0.8rem'
+    if (len <= 34) return '0.7rem'
+    if (len <= 44) return '0.6rem'
+    return '0.52rem'
+  }
   const filteredExhibitors = exhibitors.filter(ex => {
     const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase()) ||
       ex.booth_number.toLowerCase().includes(search.toLowerCase())
@@ -162,7 +171,7 @@ export default function Exhibitors() {
           .print-grid {
             display: grid !important;
             grid-template-columns: repeat(3, 1fr);
-            grid-auto-rows: 140px;
+            grid-auto-rows: 150px;
             gap: 0.75rem;
             padding: 1rem;
           }
@@ -171,7 +180,7 @@ export default function Exhibitors() {
             padding: 0.75rem;
             text-align: center;
             page-break-inside: avoid;
-            height: 140px;
+            height: 150px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -180,21 +189,16 @@ export default function Exhibitors() {
             overflow: hidden;
           }
           .pin-card .card-name {
-            font-size: 0.85rem;
             font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            word-break: break-word;
+            line-height: 1.2;
             width: 100%;
           }
           .pin-card .card-sub {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: #555;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
             margin-top: 0.15rem;
+            width: 100%;
           }
           .pin-card .pin {
             font-size: 2.25rem;
@@ -492,7 +496,7 @@ export default function Exhibitors() {
       <div className="print-grid">
         {exhibitors.map(ex => (
           <div key={ex.id} className="pin-card">
-            <div className="card-name">{ex.name}</div>
+            <div className="card-name" style={{ fontSize: cardNameSize(ex.name) }}>{ex.name}</div>
             <div className="card-sub">{ex.booth_number} · {ex.hall}</div>
             <div className="pin">{ex.pin}</div>
           </div>
