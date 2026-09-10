@@ -26,6 +26,10 @@ export default function Exhibitors() {
   const [search, setSearch] = useState('')
   const [hallFilter, setHallFilter] = useState('')
   const [pendingCsvRows, setPendingCsvRows] = useState<Array<{ name: string; booth_number: string; hall: string; is_platinum: boolean }> | null>(null)
+  const [regenId, setRegenId] = useState<string | null>(null)
+  const [regenPinValue, setRegenPinValue] = useState('')
+  const [regenError, setRegenError] = useState('')
+  const [regenSaving, setRegenSaving] = useState(false)
 
   async function loadExhibitors() {
     const { data } = await supabase.from('exhibitors').select('*').order('name')
@@ -131,11 +135,25 @@ export default function Exhibitors() {
     setEditSaving(false)
   }
 
-  async function regenPin(exhibitor: Exhibitor) {
+  function startRegen(exhibitor: Exhibitor) {
     const otherPins = new Set(exhibitors.filter(ex => ex.id !== exhibitor.id).map(ex => ex.pin))
-    const newPin = generatePin(otherPins)
-    const { error } = await supabase.from('exhibitors').update({ pin: newPin }).eq('id', exhibitor.id)
-    if (!error) await loadExhibitors()
+    setRegenId(exhibitor.id)
+    setRegenPinValue(generatePin(otherPins))
+    setRegenError('')
+  }
+
+  async function saveRegenPin(exhibitor: Exhibitor) {
+    const pin = regenPinValue.trim()
+    if (!/^\d{4}$/.test(pin)) { setRegenError('PIN must be 4 digits'); return }
+    const duplicate = exhibitors.some(ex => ex.id !== exhibitor.id && ex.pin === pin)
+    if (duplicate) { setRegenError('PIN already in use'); return }
+    setRegenSaving(true)
+    setRegenError('')
+    const { error } = await supabase.from('exhibitors').update({ pin }).eq('id', exhibitor.id)
+    if (error) { setRegenError(error.message); setRegenSaving(false); return }
+    setRegenId(null)
+    await loadExhibitors()
+    setRegenSaving(false)
   }
 
   async function togglePlatinum(exhibitor: Exhibitor) {
@@ -409,7 +427,21 @@ export default function Exhibitors() {
                         <td className="px-4 py-3 font-medium text-gray-900">{ex.name}</td>
                         <td className="px-4 py-3 text-gray-600">{ex.booth_number}</td>
                         <td className="px-4 py-3 text-gray-600">{ex.hall}</td>
-                        <td className="px-4 py-3 font-mono font-bold text-primary">{ex.pin}</td>
+                        <td className="px-2 py-2">
+                          {regenId === ex.id ? (
+                            <div className="flex flex-col gap-1">
+                              <input
+                                value={regenPinValue}
+                                onChange={e => { setRegenPinValue(e.target.value.replace(/\D/g, '').slice(0, 4)); setRegenError('') }}
+                                maxLength={4}
+                                className="w-20 border border-primary rounded px-2 py-1 text-sm font-mono font-bold text-primary text-center focus:outline-none focus:ring-2 focus:ring-primary"
+                              />
+                              {regenError && <p className="text-red-500 text-xs">{regenError}</p>}
+                            </div>
+                          ) : (
+                            <span className="px-2 font-mono font-bold text-primary">{ex.pin}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => togglePlatinum(ex)}
@@ -419,41 +451,61 @@ export default function Exhibitors() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => { setEditId(ex.id); setEditForm({ name: ex.name, booth_number: ex.booth_number, hall: ex.hall }); setEditError('') }}
-                              className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => regenPin(ex)}
-                              className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
-                            >
-                              Regen PIN
-                            </button>
-                            {confirmDeleteId === ex.id ? (
+                            {regenId === ex.id ? (
                               <>
                                 <button
-                                  onClick={() => handleDelete(ex.id)}
-                                  disabled={deleting}
-                                  className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-1 disabled:opacity-50"
+                                  onClick={() => saveRegenPin(ex)}
+                                  disabled={regenSaving}
+                                  className="text-xs text-white bg-primary hover:opacity-90 rounded px-2 py-1 disabled:opacity-50"
                                 >
-                                  {deleting ? '…' : 'Confirm'}
+                                  {regenSaving ? '…' : 'Save'}
                                 </button>
                                 <button
-                                  onClick={() => setConfirmDeleteId(null)}
+                                  onClick={() => { setRegenId(null); setRegenError('') }}
                                   className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
                                 >
                                   Cancel
                                 </button>
                               </>
                             ) : (
-                              <button
-                                onClick={() => setConfirmDeleteId(ex.id)}
-                                className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-2 py-1"
-                              >
-                                Delete
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { setEditId(ex.id); setEditForm({ name: ex.name, booth_number: ex.booth_number, hall: ex.hall }); setEditError('') }}
+                                  className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => startRegen(ex)}
+                                  className="text-xs text-gray-500 hover:text-primary border border-gray-200 rounded px-2 py-1"
+                                >
+                                  Regen PIN
+                                </button>
+                                {confirmDeleteId === ex.id ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleDelete(ex.id)}
+                                      disabled={deleting}
+                                      className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-1 disabled:opacity-50"
+                                    >
+                                      {deleting ? '…' : 'Confirm'}
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteId(null)}
+                                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmDeleteId(ex.id)}
+                                    className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-2 py-1"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
