@@ -62,15 +62,15 @@ export default function Exhibitors() {
     setImportError('')
     setPendingCsvRows(null)
     try {
-      const existingMap = new Map(exhibitors.map(ex => [ex.booth_number, ex]))
+      const existingMap = new Map(exhibitors.map(ex => [`${ex.name}|${ex.booth_number}`, ex]))
 
       const usedPins = new Set(
         pendingCsvRows
-          .map(row => existingMap.get(row.booth_number)?.pin)
+          .map(row => existingMap.get(`${row.name}|${row.booth_number}`)?.pin)
           .filter((p): p is string => p !== undefined)
       )
       const inserts = pendingCsvRows.map(row => {
-        const existing = existingMap.get(row.booth_number)
+        const existing = existingMap.get(`${row.name}|${row.booth_number}`)
         const pin = existing ? existing.pin : generatePin(usedPins)
         usedPins.add(pin)
         const is_platinum = existing ? (existing.is_platinum || row.is_platinum) : row.is_platinum
