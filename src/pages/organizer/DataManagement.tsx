@@ -35,7 +35,7 @@ export default function DataManagement() {
         .order('visited_at', { ascending: false }),
     ])
 
-    const raw = (visitsRes.data ?? []) as Array<{
+    const raw = (visitsRes.data ?? []) as unknown as Array<{
       id: string
       visitor_id: string
       exhibitor_id: string
