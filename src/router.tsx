@@ -11,6 +11,7 @@ import VisitFeed from './pages/organizer/VisitFeed'
 import Analytics from './pages/organizer/Analytics'
 import LuckyDraw from './pages/organizer/LuckyDraw'
 import Settings from './pages/organizer/Settings'
+import DataManagement from './pages/organizer/DataManagement'
 import VisitorRoute from './guards/VisitorRoute'
 import OrganizerRoute from './guards/OrganizerRoute'
 import SiteGate from './guards/SiteGate'
@@ -27,5 +28,6 @@ export const router = createBrowserRouter([
   { path: '/organizer/feed', element: <OrganizerRoute><VisitFeed /></OrganizerRoute> },
   { path: '/organizer/analytics', element: <OrganizerRoute><Analytics /></OrganizerRoute> },
   { path: '/organizer/draw', element: <OrganizerRoute><LuckyDraw /></OrganizerRoute> },
+  { path: '/organizer/users', element: <OrganizerRoute><DataManagement /></OrganizerRoute> },
   { path: '/organizer/settings', element: <OrganizerRoute><Settings /></OrganizerRoute> },
 ])

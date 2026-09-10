@@ -71,6 +71,7 @@ export default function Settings() {
           <Link to="/organizer/feed" className="hover:underline">Feed</Link>
           <Link to="/organizer/analytics" className="hover:underline">Analytics</Link>
           <Link to="/organizer/draw" className="hover:underline">Lucky Draw</Link>
+          <Link to="/organizer/users" className="hover:underline">Users</Link>
           <Link to="/organizer/settings" className="underline">Settings</Link>
           <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
           <button onClick={signOut} className="bg-white text-primary font-semibold px-3 py-1 rounded">Sign Out</button>
