@@ -34,7 +34,7 @@ export default function SiteGate({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Coming soon</h1>
         <p className="text-gray-500 text-sm max-w-xs">
-          Registration for InfoComm India 2026 is not open yet. Check back closer to the event.
+          Registration for the InfoComm India 2026 Lucky Draw is not open yet. Check back on 16 September 2026.
         </p>
       </div>
     )

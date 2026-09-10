@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, type Profile } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { downloadExcel } from '../../lib/export'
 
 type VisitRow = {
   id: string
@@ -109,11 +110,45 @@ export default function DataManagement() {
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          {!loading && (
-            <span className="text-sm text-gray-500">
-              {users.length} registered visitor{users.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {!loading && users.length > 0 && (
+              <button
+                onClick={() => downloadExcel('users.xlsx', [
+                  {
+                    name: 'Users',
+                    rows: users.map(u => ({
+                      'Name': u.name,
+                      'Email': u.email,
+                      'Company': u.company_name ?? '',
+                      'Visits': visits.filter(v => v.visitor_id === u.id).length,
+                    })),
+                  },
+                  {
+                    name: 'Visits',
+                    rows: visits.map(v => {
+                      const user = users.find(u => u.id === v.visitor_id)
+                      return {
+                        'Visitor': user?.name ?? '',
+                        'Email': user?.email ?? '',
+                        'Exhibitor': v.exhibitor_name,
+                        'Hall': v.exhibitor_hall,
+                        'Day': v.day,
+                        'Time': new Date(v.visited_at).toLocaleString('en-IN'),
+                      }
+                    }),
+                  },
+                ])}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Export Excel
+              </button>
+            )}
+            {!loading && (
+              <span className="text-sm text-gray-500">
+                {users.length} registered visitor{users.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}

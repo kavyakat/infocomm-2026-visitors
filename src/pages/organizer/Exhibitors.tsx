@@ -4,6 +4,7 @@ import { supabase, type Exhibitor } from '../../lib/supabase'
 import { generatePin } from '../../lib/pins'
 import { useAuth } from '../../hooks/useAuth'
 import { parseExhibitorCsv } from '../../lib/exhibitors'
+import { downloadExcel } from '../../lib/export'
 
 export default function Exhibitors() {
   const { signOut } = useAuth()
@@ -218,6 +219,23 @@ export default function Exhibitors() {
             >
               Print PIN Sheet
             </button>
+            {exhibitors.length > 0 && (
+              <button
+                onClick={() => downloadExcel('exhibitors.xlsx', [{
+                  name: 'Exhibitors',
+                  rows: exhibitors.map(ex => ({
+                    'Name': ex.name,
+                    'Booth': ex.booth_number,
+                    'Hall': ex.hall,
+                    'PIN': ex.pin,
+                    'Platinum': ex.is_platinum ? 'Yes' : 'No',
+                  })),
+                }])}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Export Excel
+              </button>
+            )}
           </div>
         </div>
 

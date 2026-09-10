@@ -268,7 +268,7 @@ export default function LuckyDraw() {
     const { error: delErr } = await supabase
       .from('lucky_draw_winners')
       .delete()
-      .gte('created_at', '1970-01-01')
+      .not('id', 'is', null)
     if (delErr) { setError(delErr.message); return }
 
     const prevActive = winners.filter(w => !w.redrawn)
