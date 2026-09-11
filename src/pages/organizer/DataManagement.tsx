@@ -65,10 +65,17 @@ export default function DataManagement() {
   async function deleteUser(userId: string) {
     setDeleting(true)
     setError('')
-    const { error } = await supabase.rpc('delete_visitor', { p_user_id: userId })
-    if (error) {
-      console.error('[deleteUser]', error)
-      setError(error.message)
+    const { error: visitErr } = await supabase.from('visits').delete().eq('visitor_id', userId)
+    if (visitErr) {
+      console.error('[deleteUser] visits delete failed:', visitErr)
+      setError(visitErr.message)
+      setDeleting(false)
+      return
+    }
+    const { error: profileErr } = await supabase.from('profiles').delete().eq('id', userId)
+    if (profileErr) {
+      console.error('[deleteUser] profile delete failed:', profileErr)
+      setError(profileErr.message)
       setDeleting(false)
       return
     }
