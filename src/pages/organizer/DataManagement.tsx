@@ -65,24 +65,10 @@ export default function DataManagement() {
   async function deleteUser(userId: string) {
     setDeleting(true)
     setError('')
-    const { error: visitErr } = await supabase.from('visits').delete().eq('visitor_id', userId)
-    if (visitErr) {
-      console.error('[deleteUser] visits delete failed:', visitErr)
-      setError(visitErr.message)
-      setDeleting(false)
-      return
-    }
-    const { data: deleted, error: profileErr } = await supabase.from('profiles').delete().eq('id', userId).select('id')
-    if (profileErr) {
-      console.error('[deleteUser] profile delete failed:', profileErr)
-      setError(profileErr.message)
-      setDeleting(false)
-      return
-    }
-    if (!deleted || deleted.length === 0) {
-      const msg = 'Delete blocked by database policy — no rows were affected. Check RLS policies on the profiles table.'
-      console.error('[deleteUser]', msg)
-      setError(msg)
+    const { error } = await supabase.rpc('delete_visitor', { p_user_id: userId })
+    if (error) {
+      console.error('[deleteUser]', error)
+      setError(error.message)
       setDeleting(false)
       return
     }
