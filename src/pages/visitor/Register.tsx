@@ -60,6 +60,7 @@ export default function Register() {
               required
               value={name}
               onChange={e => setName(e.target.value)}
+              placeholder="e.g. Priya Sharma"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -70,6 +71,7 @@ export default function Register() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
+              placeholder="e.g. priya@example.com"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -82,6 +84,7 @@ export default function Register() {
               pattern="[0-9]+"
               value={mobile}
               onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}
+              placeholder="e.g. 9876543210"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -91,6 +94,7 @@ export default function Register() {
               required
               value={company}
               onChange={e => setCompany(e.target.value)}
+              placeholder="e.g. Acme Technologies"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -100,6 +104,7 @@ export default function Register() {
               required
               value={designation}
               onChange={e => setDesignation(e.target.value)}
+              placeholder="e.g. Product Manager"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
