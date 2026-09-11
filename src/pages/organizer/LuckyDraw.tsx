@@ -77,7 +77,7 @@ export default function LuckyDraw() {
       .from('lucky_draw_winners')
       .select('id, visitor_id, prize_rank, redrawn, profiles(name, email, company_name, designation)')
       .order('prize_rank')
-    if (err) { setError(err.message); return }
+    if (err) { console.error('[loadWinners]', err); setError(err.message); return }
 
     setWinners((data ?? []).map(w => {
       const wr = w as unknown as {
@@ -257,7 +257,7 @@ export default function LuckyDraw() {
       .from('lucky_draw_winners')
       .update({ redrawn: true })
       .eq('id', winner.id)
-    if (updateErr) { setError(updateErr.message); return }
+    if (updateErr) { console.error('[redraw]', updateErr); setError(updateErr.message); return }
     setWinners(prev => prev.map(w => w.id === winner.id ? { ...w, redrawn: true } : w))
     if (poolBuilt) {
       setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
@@ -269,7 +269,7 @@ export default function LuckyDraw() {
       .from('lucky_draw_winners')
       .delete()
       .not('id', 'is', null)
-    if (delErr) { setError(delErr.message); return }
+    if (delErr) { console.error('[resetDraw]', delErr); setError(delErr.message); return }
 
     const prevActive = winners.filter(w => !w.redrawn)
     setPool(prev => [

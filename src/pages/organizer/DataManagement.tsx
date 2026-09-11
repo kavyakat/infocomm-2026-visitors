@@ -66,9 +66,26 @@ export default function DataManagement() {
     setDeleting(true)
     setError('')
     const { error: visitErr } = await supabase.from('visits').delete().eq('visitor_id', userId)
-    if (visitErr) { setError(visitErr.message); setDeleting(false); return }
-    const { error: profileErr } = await supabase.from('profiles').delete().eq('id', userId)
-    if (profileErr) { setError(profileErr.message); setDeleting(false); return }
+    if (visitErr) {
+      console.error('[deleteUser] visits delete failed:', visitErr)
+      setError(visitErr.message)
+      setDeleting(false)
+      return
+    }
+    const { data: deleted, error: profileErr } = await supabase.from('profiles').delete().eq('id', userId).select('id')
+    if (profileErr) {
+      console.error('[deleteUser] profile delete failed:', profileErr)
+      setError(profileErr.message)
+      setDeleting(false)
+      return
+    }
+    if (!deleted || deleted.length === 0) {
+      const msg = 'Delete blocked by database policy — no rows were affected. Check RLS policies on the profiles table.'
+      console.error('[deleteUser]', msg)
+      setError(msg)
+      setDeleting(false)
+      return
+    }
     setConfirmDeleteUser(null)
     if (expandedUser === userId) setExpandedUser(null)
     await load()
@@ -78,8 +95,20 @@ export default function DataManagement() {
   async function deleteVisit(visitId: string) {
     setDeleting(true)
     setError('')
-    const { error: err } = await supabase.from('visits').delete().eq('id', visitId)
-    if (err) { setError(err.message); setDeleting(false); return }
+    const { data: deleted, error: err } = await supabase.from('visits').delete().eq('id', visitId).select('id')
+    if (err) {
+      console.error('[deleteVisit] failed:', err)
+      setError(err.message)
+      setDeleting(false)
+      return
+    }
+    if (!deleted || deleted.length === 0) {
+      const msg = 'Delete blocked by database policy — no rows were affected. Check RLS policies on the visits table.'
+      console.error('[deleteVisit]', msg)
+      setError(msg)
+      setDeleting(false)
+      return
+    }
     setConfirmDeleteVisit(null)
     setVisits(prev => prev.filter(v => v.id !== visitId))
     setDeleting(false)

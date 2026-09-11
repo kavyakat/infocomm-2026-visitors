@@ -81,12 +81,13 @@ export default function Exhibitors() {
       })
 
       const { error: delError } = await supabase.from('exhibitors').delete().gte('created_at', '1970-01-01')
-      if (delError) { setImportError(delError.message); setImporting(false); return }
+      if (delError) { console.error('[csvImport] delete failed:', delError); setImportError(delError.message); setImporting(false); return }
 
       const { error } = await supabase.from('exhibitors').insert(inserts)
-      if (error) { setImportError(error.message); setImporting(false); return }
+      if (error) { console.error('[csvImport] insert failed:', error); setImportError(error.message); setImporting(false); return }
       await loadExhibitors()
-    } catch {
+    } catch (e) {
+      console.error('[csvImport] unexpected error:', e)
       setImportError('Failed to import CSV')
     }
     setImporting(false)
@@ -102,7 +103,7 @@ export default function Exhibitors() {
     const existingPins = new Set(exhibitors.map(ex => ex.pin))
     const pin = generatePin(existingPins)
     const { error } = await supabase.from('exhibitors').insert([{ ...addForm, pin }])
-    if (error) { setAddError(error.message); setAdding(false); return }
+    if (error) { console.error('[handleAdd]', error); setAddError(error.message); setAdding(false); return }
     setAddForm({ name: '', booth_number: '', hall: '' })
     setShowAddForm(false)
     await loadExhibitors()
@@ -111,7 +112,8 @@ export default function Exhibitors() {
 
   async function handleDelete(id: string) {
     setDeleting(true)
-    await supabase.from('exhibitors').delete().eq('id', id)
+    const { error } = await supabase.from('exhibitors').delete().eq('id', id)
+    if (error) console.error('[handleDelete]', error)
     setConfirmDeleteId(null)
     await loadExhibitors()
     setDeleting(false)
@@ -129,7 +131,7 @@ export default function Exhibitors() {
       booth_number: editForm.booth_number.trim(),
       hall: editForm.hall.trim(),
     }).eq('id', editId!)
-    if (error) { setEditError(error.message); setEditSaving(false); return }
+    if (error) { console.error('[handleEditSave]', error); setEditError(error.message); setEditSaving(false); return }
     setEditId(null)
     await loadExhibitors()
     setEditSaving(false)
@@ -150,7 +152,7 @@ export default function Exhibitors() {
     setRegenSaving(true)
     setRegenError('')
     const { error } = await supabase.from('exhibitors').update({ pin }).eq('id', exhibitor.id)
-    if (error) { setRegenError(error.message); setRegenSaving(false); return }
+    if (error) { console.error('[saveRegenPin]', error); setRegenError(error.message); setRegenSaving(false); return }
     setRegenId(null)
     await loadExhibitors()
     setRegenSaving(false)
@@ -161,7 +163,8 @@ export default function Exhibitors() {
       .from('exhibitors')
       .update({ is_platinum: !exhibitor.is_platinum })
       .eq('id', exhibitor.id)
-    if (!error) setExhibitors(prev => prev.map(ex => ex.id === exhibitor.id ? { ...ex, is_platinum: !ex.is_platinum } : ex))
+    if (error) { console.error('[togglePlatinum]', error); return }
+    setExhibitors(prev => prev.map(ex => ex.id === exhibitor.id ? { ...ex, is_platinum: !ex.is_platinum } : ex))
   }
 
   const halls = Array.from(new Set(exhibitors.map(ex => ex.hall))).sort()
