@@ -113,11 +113,21 @@ export default function MyEligibility() {
         </div>
 
         {/* Prize T&C */}
-        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 space-y-2">
           <p className="text-xs text-primary font-medium leading-relaxed text-center italic">
             Winner must be present at the Smart Tech Stage, Jasmine Hall, at 2:00 PM on 18 September 2026 to claim the iPhone 17.
             If not present, the prize is forfeited and a redraw may take place. All terms and conditions apply.
           </p>
+          <div className="text-center">
+            <a
+              href="https://odnjyqgplchvbjhvvehg.supabase.co/storage/v1/object/public/documents/ICI26_LuckyDraw_Terms_and_Conditions.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary underline font-medium"
+            >
+              View full Terms &amp; Conditions
+            </a>
+          </div>
         </div>
       </div>
 
