@@ -115,7 +115,7 @@ export default function MyEligibility() {
         {/* Prize T&C */}
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
           <p className="text-xs text-primary font-medium leading-relaxed text-center italic">
-            Winner must be present at the Buyer Lounge, Pavilion Hall, at 2:00 PM on 18 September 2026 to claim the iPhone 17.
+            Winner must be present at the Smart Tech Stage, Jasmine Hall, at 2:00 PM on 18 September 2026 to claim the iPhone 17.
             If not present, the prize is forfeited and a redraw may take place. All terms and conditions apply.
           </p>
         </div>
