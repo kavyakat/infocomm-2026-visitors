@@ -44,7 +44,7 @@ export default function Leaderboard() {
         exhibitors: { hall: string } | null
       }>
 
-      setEntries(buildLeaderboardEntries(
+      const allEntries = buildLeaderboardEntries(
         profilesRes.data ?? [],
         rawVisits.map(v => ({
           visitor_id: v.visitor_id,
@@ -53,7 +53,8 @@ export default function Leaderboard() {
           day: v.day,
           rating: v.rating,
         }))
-      ))
+      )
+      setEntries(isOrganizer ? allEntries.filter(e => e.visitCount > 0) : allEntries)
 
       setLoading(false)
     }
