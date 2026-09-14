@@ -9,58 +9,49 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      issues: write
     steps:
-      - name: Find PR for this deployment
-        id: find-pr
+      - name: Wait for Vercel to finish updating its comment
+        run: sleep 10
+
+      - name: Append preview links to Vercel bot comment
         uses: actions/github-script@v7
         with:
           script: |
+            const url = context.payload.deployment_status.target_url;
             const sha = context.payload.deployment.sha;
+
+            // Find the open PR for this SHA
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
             });
             const pr = prs.find(p => p.head.sha === sha);
-            if (!pr) { core.setOutput('pr_number', ''); return; }
-            core.setOutput('pr_number', String(pr.number));
+            if (!pr) return;
 
-      - name: Post preview links
-        if: steps.find-pr.outputs.pr_number != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = context.payload.deployment_status.target_url;
-            const pr = Number('${{ steps.find-pr.outputs.pr_number }}');
-            const body = [
-              '### Preview links',
-              '',
-              `- [Preview (visitor login)](${url}/)`,
-              `- [Preview (organizer login)](${url}/organizer)`,
-            ].join('\n');
-
-            // Update existing comment if one already exists, else create
+            // Find the vercel[bot] comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: pr,
+              issue_number: pr.number,
             });
-            const existing = comments.find(c =>
-              c.user.login === 'github-actions[bot]' &&
-              c.body.startsWith('### Preview links')
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr,
-                body,
-              });
-            }
+            const vercelComment = comments.find(c => c.user.login === 'vercel[bot]');
+            if (!vercelComment) return;
+
+            const SEPARATOR = '\n\n---\n\n';
+            const MARKER = '- [Preview (visitor login)]';
+
+            // Strip previously appended section so we don't accumulate duplicates
+            let base = vercelComment.body;
+            const markerIdx = base.indexOf(SEPARATOR + MARKER);
+            if (markerIdx !== -1) base = base.slice(0, markerIdx);
+
+            const appended = `${base}${SEPARATOR}- [Preview (visitor login)](${url}/)\n- [Preview (organizer login)](${url}/organizer)`;
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: vercelComment.id,
+              body: appended,
+            });
