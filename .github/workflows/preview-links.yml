@@ -1,0 +1,66 @@
+name: Preview links
+
+on:
+  deployment_status:
+
+jobs:
+  comment:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment != 'Production'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Find PR for this deployment
+        id: find-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.deployment.sha;
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+            });
+            const pr = prs.find(p => p.head.sha === sha);
+            if (!pr) { core.setOutput('pr_number', ''); return; }
+            core.setOutput('pr_number', String(pr.number));
+
+      - name: Post preview links
+        if: steps.find-pr.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = context.payload.deployment_status.target_url;
+            const pr = Number('${{ steps.find-pr.outputs.pr_number }}');
+            const body = [
+              '### Preview links',
+              '',
+              `- [Preview (visitor login)](${url}/)`,
+              `- [Preview (organizer login)](${url}/organizer)`,
+            ].join('\n');
+
+            // Update existing comment if one already exists, else create
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.startsWith('### Preview links')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                body,
+              });
+            }
