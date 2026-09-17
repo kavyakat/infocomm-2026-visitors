@@ -297,6 +297,15 @@ export default function LuckyDraw() {
     ])
   }
 
+  const riggedEnabled = (() => {
+    try {
+      const raw = localStorage.getItem('manualDrawConfig')
+      if (!raw) return false
+      const cfg = JSON.parse(raw) as { enabled: boolean }
+      return cfg.enabled === true
+    } catch { return false }
+  })()
+
   const riggedHasNext = (() => {
     try {
       const raw = localStorage.getItem('manualDrawConfig')
@@ -309,8 +318,8 @@ export default function LuckyDraw() {
 
   const activeWinners = winners.filter(w => !w.redrawn)
   const nextRank = nextPrizeRank(activeWinners.map(w => w.prize_rank))
-  const canDraw = (pool.length > 0 || riggedHasNext) && !drawing
-  const canRedraw = pool.length > 0 || riggedHasNext
+  const canDraw = (riggedEnabled ? riggedHasNext : pool.length > 0) && !drawing
+  const canRedraw = riggedEnabled ? riggedHasNext : pool.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
