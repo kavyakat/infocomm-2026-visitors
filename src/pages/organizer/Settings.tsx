@@ -39,6 +39,7 @@ export default function Settings() {
   const [poolSearching, setPoolSearching] = useState(false)
   const [poolAdding, setPoolAdding] = useState<Set<string>>(new Set())
   const [poolRemoving, setPoolRemoving] = useState<Set<string>>(new Set())
+  const [poolRestoring, setPoolRestoring] = useState<Set<string>>(new Set())
 
   const activePoolCount = poolMembersLoaded ? poolMembers.filter(m => !m.excluded).length : null
 
@@ -239,6 +240,21 @@ export default function Settings() {
       }
     } finally {
       setPoolRemoving(prev => { const n = new Set(prev); n.delete(member.id); return n })
+    }
+  }
+
+  async function restoreToPool(member: PoolMember) {
+    setPoolRestoring(prev => new Set(prev).add(member.id))
+    setPoolBuildError('')
+    try {
+      const { error: upErr } = await supabase
+        .from('lucky_draw_eligible_snapshot')
+        .update({ excluded: false })
+        .eq('id', member.id)
+      if (upErr) { setPoolBuildError(upErr.message); return }
+      setPoolMembers(prev => prev.map(m => m.id === member.id ? { ...m, excluded: false } : m))
+    } finally {
+      setPoolRestoring(prev => { const n = new Set(prev); n.delete(member.id); return n })
     }
   }
 
@@ -483,7 +499,13 @@ export default function Settings() {
                           </div>
                         </div>
                         {m.excluded ? (
-                          <span className="ml-3 shrink-0 text-xs text-gray-400 font-medium">Removed</span>
+                          <button
+                            onClick={() => restoreToPool(m)}
+                            disabled={poolRestoring.has(m.id)}
+                            className="ml-3 shrink-0 text-xs font-semibold px-2.5 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            {poolRestoring.has(m.id) ? '…' : 'Add back'}
+                          </button>
                         ) : (
                           <button
                             onClick={() => removeFromPool(m)}
