@@ -148,13 +148,11 @@ export default function LuckyDraw() {
 
     type RiggedEntry = { visitor_id: string; name: string; company: string; designation: string }
     let riggedOverride: RiggedEntry | null = null
-    let isRiggedMode = false
     try {
       const raw = localStorage.getItem('manualDrawConfig')
       if (raw) {
         const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number } & RiggedEntry> }
         if (cfg.enabled) {
-          isRiggedMode = true
           const sorted = [...cfg.winners].sort((a, b) => a.position - b.position)
           riggedOverride = sorted[winners.length] ?? null
         }
@@ -299,15 +297,6 @@ export default function LuckyDraw() {
       },
     ])
   }
-
-  const riggedEnabled = (() => {
-    try {
-      const raw = localStorage.getItem('manualDrawConfig')
-      if (!raw) return false
-      const cfg = JSON.parse(raw) as { enabled: boolean }
-      return cfg.enabled === true
-    } catch { return false }
-  })()
 
   const riggedHasNext = (() => {
     try {
