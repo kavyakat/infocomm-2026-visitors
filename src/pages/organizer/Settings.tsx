@@ -60,8 +60,7 @@ export default function Settings() {
     setSiteOpenSaving(false)
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave() {
     setSaving(true)
     setSaved(false)
     setError('')
@@ -242,7 +241,7 @@ export default function Settings() {
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
-        <form onSubmit={handleSave} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <h2 className="text-base font-semibold text-gray-800">Draw settings</h2>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -326,14 +325,7 @@ export default function Settings() {
             </p>
           </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-primary text-white rounded-lg py-3 font-semibold disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Settings'}
-          </button>
-        </form>
+        </div>
 
         {/* Draw Pool */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
@@ -415,6 +407,14 @@ export default function Settings() {
             )}
           </div>
         </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-primary text-white rounded-lg py-3 font-semibold disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Settings'}
+        </button>
 
       </div>
     </div>
