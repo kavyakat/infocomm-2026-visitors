@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-type PresetWinner = {
+type ManualWinner = {
   position: 1 | 2 | 3
   name: string
   designation: string
@@ -24,8 +24,8 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[\s_-]+/g, '')
 }
 
-export default function PresetDraw() {
-  const [winners, setWinners] = useState<PresetWinner[]>([])
+export default function ManualDraw() {
+  const [winners, setWinners] = useState<ManualWinner[]>([])
   const [error, setError] = useState('')
 
   function downloadSample() {
@@ -38,7 +38,7 @@ export default function PresetDraw() {
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'PresetDraw')
-      XLSX.writeFile(wb, 'preset-draw-sample.xlsx')
+      XLSX.writeFile(wb, 'manual-draw-sample.xlsx')
     })
   }
 
@@ -74,7 +74,7 @@ export default function PresetDraw() {
           return
         }
 
-        const parsed: PresetWinner[] = []
+        const parsed: ManualWinner[] = []
         for (const row of raw) {
           const pos = Number(row[posKey])
           if (pos === 1 || pos === 2 || pos === 3) {
