@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -47,6 +47,11 @@ function rankLabel(rank: number): string {
   return `${rank}${suffix} Place`
 }
 
+const ROW_HEIGHT = 44
+const DRUM_WINDOW_HEIGHT = 220
+const DRUM_WINNER_INDEX = 44
+const DRUM_END_OFFSET = DRUM_WINNER_INDEX * ROW_HEIGHT + ROW_HEIGHT / 2 - DRUM_WINDOW_HEIGHT / 2
+
 export default function LuckyDraw() {
   const { signOut } = useAuth()
   const [pool, setPool] = useState<Candidate[]>([])
@@ -54,19 +59,24 @@ export default function LuckyDraw() {
   const [winners, setWinners] = useState<WinnerRow[]>([])
   const [drawing, setDrawing] = useState(false)
   const [animDuration, setAnimDuration] = useState(10)
-  const [spinning, setSpinning] = useState(false)
-  const [displayedName, setDisplayedName] = useState('')
+  const [allProfiles, setAllProfiles] = useState<{ id: string; name: string }[]>([])
+  const [drumNames, setDrumNames] = useState<string[]>([])
+  const [drumOffset, setDrumOffset] = useState(0)
   const [newWinnerId, setNewWinnerId] = useState<string | null>(null)
   const [celebrationWinner, setCelebrationWinner] = useState<WinnerRow | null>(null)
   const [resetConfirm, setResetConfirm] = useState(false)
   const [error, setError] = useState('')
-  const spinRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     if (!celebrationWinner) return
     const timer = setTimeout(() => setCelebrationWinner(null), 5000)
     return () => clearTimeout(timer)
   }, [celebrationWinner])
+
+  useEffect(() => {
+    if (!drawing) return
+    requestAnimationFrame(() => { setDrumOffset(DRUM_END_OFFSET) })
+  }, [drawing])
 
   async function loadWinners() {
     const { data, error: err } = await supabase
@@ -117,6 +127,14 @@ export default function LuckyDraw() {
         setPool(rows.map(r => ({ id: r.visitor_id, name: r.name, email: r.email })))
       })
 
+    supabase
+      .from('profiles')
+      .select('id, name')
+      .eq('role', 'visitor')
+      .then(({ data }) => {
+        setAllProfiles((data ?? []) as { id: string; name: string }[])
+      })
+
     const channel = supabase
       .channel('lucky-draw-winners')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lucky_draw_winners' }, () => {
@@ -124,10 +142,7 @@ export default function LuckyDraw() {
       })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-      if (spinRef.current) clearInterval(spinRef.current)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   async function runDraw() {
@@ -168,30 +183,28 @@ export default function LuckyDraw() {
       displayDesignation = profile?.designation ?? ''
     }
 
-    setDrawing(true)
-    setError('')
-    setSpinning(true)
-
-    const spinNames = pool.length > 0 ? pool.map(c => c.name) : [displayName]
-
-    function startPhase(speed: number) {
-      if (spinRef.current) clearInterval(spinRef.current)
-      spinRef.current = setInterval(() => {
-        setDisplayedName(spinNames[Math.floor(Math.random() * spinNames.length)])
-      }, speed)
+    // Build drum: 50 rows, winner at DRUM_WINNER_INDEX, excluding current active winners
+    const excludedIds = new Set(activeWinners.map(w => w.visitor_id))
+    const base = (allProfiles.length > 0 ? allProfiles : pool.map(p => ({ id: p.id, name: p.name })))
+      .filter(p => !excludedIds.has(p.id))
+      .map(p => p.name)
+    const shuffled = [...base].sort(() => Math.random() - 0.5)
+    const drum: string[] = []
+    for (let i = 0; i < DRUM_WINNER_INDEX; i++) {
+      drum.push(shuffled.length > 0 ? shuffled[i % shuffled.length] : displayName)
+    }
+    drum.push(displayName)
+    const tail = shuffled.filter(n => n !== displayName)
+    for (let i = DRUM_WINNER_INDEX + 1; i < 50; i++) {
+      drum.push(tail.length > 0 ? tail[(i - DRUM_WINNER_INDEX - 1) % tail.length] : displayName)
     }
 
-    startPhase(60)
-    setTimeout(() => startPhase(120), Math.round(animDuration * 0.3158 * 1000))
-    setTimeout(() => startPhase(220), Math.round(animDuration * 0.5263 * 1000))
-    setTimeout(() => startPhase(380), Math.round(animDuration * 0.7368 * 1000))
-    setTimeout(() => startPhase(600), Math.round(animDuration * 0.8684 * 1000))
+    setDrumNames(drum)
+    setDrumOffset(0)
+    setDrawing(true)
+    setError('')
 
     setTimeout(async () => {
-      if (spinRef.current) { clearInterval(spinRef.current); spinRef.current = null }
-      setDisplayedName(displayName)
-      setSpinning(false)
-
       try {
         const { data: inserted, error: insertErr } = await supabase
           .from('lucky_draw_winners')
@@ -215,13 +228,14 @@ export default function LuckyDraw() {
         setWinners(prev => [...prev, newWinner].sort((a, b) => a.prize_rank - b.prize_rank))
         setPool(prev => prev.filter(c => c.id !== winnerId))
         setNewWinnerId((inserted as { id: string }).id)
+        setTimeout(() => setNewWinnerId(null), 600)
         setCelebrationWinner(newWinner)
       } catch (e) {
         setError(String(e))
       } finally {
         setDrawing(false)
       }
-    }, Math.round(animDuration * 1000))
+    }, animDuration * 1000)
   }
 
   async function redraw(winner: WinnerRow) {
@@ -292,6 +306,49 @@ export default function LuckyDraw() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {drawing && (
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/85">
+          <div className="text-xs font-semibold text-white/70 uppercase tracking-widest mb-6">
+            Drawing — {rankLabel(nextRank)}
+          </div>
+          <div style={{ width: 360, height: DRUM_WINDOW_HEIGHT, overflow: 'hidden', position: 'relative' }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                height: ROW_HEIGHT,
+                left: 0,
+                right: 0,
+                background: 'rgba(255,255,255,0.1)',
+                border: '2px solid rgba(255,255,255,0.5)',
+                borderRadius: 8,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+            <div
+              style={{
+                transform: `translateY(-${drumOffset}px)`,
+                transition: drumOffset > 0
+                  ? `transform ${(animDuration - 0.4).toFixed(1)}s cubic-bezier(0.05, 0, 0.1, 1)`
+                  : 'none',
+              }}
+            >
+              {drumNames.map((name, i) => (
+                <div
+                  key={i}
+                  style={{ height: ROW_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  className="text-white text-xl font-semibold px-4 text-center"
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {celebrationWinner && (
         <>
           <style>{`
@@ -348,30 +405,14 @@ export default function LuckyDraw() {
       <div className="max-w-2xl mx-auto p-6 space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Lucky Draw</h1>
+          {pool.length > 0 && (
+            <span className="text-sm text-gray-500">{pool.length + activeWinners.length} eligible visitor{pool.length + activeWinners.length !== 1 ? 's' : ''}</span>
+          )}
         </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
-        {/* Draw controls */}
-        {drawing ? (
-          <>
-            <style>{`
-              @keyframes flicker {
-                0%, 100% { opacity: 1; }
-                50%       { opacity: 0.55; }
-              }
-              .animate-flicker { animation: flicker 0.15s ease-in-out infinite; }
-            `}</style>
-            <div className="w-full min-h-[120px] bg-primary rounded-xl flex flex-col items-center justify-center p-6 text-center">
-              <div className="text-xs font-semibold text-white/70 uppercase tracking-widest mb-3">
-                {rankLabel(nextRank)}
-              </div>
-              <div className={`text-2xl font-bold text-white ${spinning ? 'animate-flicker' : ''}`}>
-                {displayedName || '…'}
-              </div>
-            </div>
-          </>
-        ) : (
+        {!drawing && (
           <div className="flex flex-wrap gap-3 justify-center">
             <button
               onClick={runDraw}
@@ -395,7 +436,6 @@ export default function LuckyDraw() {
           </div>
         )}
 
-        {/* Winners list */}
         {winners.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
