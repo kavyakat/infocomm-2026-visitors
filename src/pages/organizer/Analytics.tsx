@@ -20,6 +20,7 @@ type QualRow = {
   platinum: number
   social: boolean
   qualified: boolean
+  reasons: string[]
   totalVisits: number
 }
 
@@ -242,6 +243,7 @@ export default function Analytics() {
           platinum: result.platinumVisits,
           social,
           qualified: result.eligible,
+          reasons: result.reasons,
           totalVisits: visitorVisitCounts.get(p.id) ?? 0,
         }
       }).sort((a, b) => b.totalVisits - a.totalVisits)
@@ -567,7 +569,7 @@ export default function Analytics() {
                                   : <span className="text-red-500 font-bold">✗</span>}
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.qualified ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.qualified ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-600'}`} title={r.qualified ? undefined : r.reasons.join('; ')}>
                                   {r.qualified ? 'Yes' : 'No'}
                                 </span>
                               </td>
