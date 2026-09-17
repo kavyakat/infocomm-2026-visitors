@@ -127,8 +127,7 @@ export default function ManualDraw() {
           )}
         </div>
 
-        {assignedCount > 0 && (
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-4 py-3">
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-4 py-3">
             <input
               type="checkbox"
               checked={enabled}
@@ -139,7 +138,6 @@ export default function ManualDraw() {
             />
             Use selected winners for live draw
           </label>
-        )}
 
         {enabled && assignedCount === 0 && (
           <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
