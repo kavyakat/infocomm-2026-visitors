@@ -70,7 +70,7 @@ export default function ManualDraw() {
         const posKey = find('final-position')
 
         if (!nameKey || !desigKey || !compKey || !posKey) {
-          setError('Required columns not found. Expected: name, designation, company, final-position.')
+          setError('Required columns not found. Please use the sample file as a template.')
           return
         }
 
@@ -88,7 +88,7 @@ export default function ManualDraw() {
         }
 
         if (parsed.length === 0) {
-          setError('No rows with final-position 1, 2, or 3 found in the file.')
+          setError('No draw results found in the file. Please check the file and try again.')
           return
         }
 
@@ -110,10 +110,9 @@ export default function ManualDraw() {
 
       <div className="max-w-xl mx-auto p-6 space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-gray-800">Upload Winner List</h2>
+          <h2 className="text-base font-semibold text-gray-800">Upload Participant File</h2>
           <p className="text-sm text-gray-500">
-            Upload an Excel file with columns: <code className="text-xs bg-gray-100 px-1 rounded">name</code>, <code className="text-xs bg-gray-100 px-1 rounded">designation</code>, <code className="text-xs bg-gray-100 px-1 rounded">company</code>, <code className="text-xs bg-gray-100 px-1 rounded">final-position</code>.
-            Rows with position 1, 2, or 3 are shown as winners.
+            Upload the participant Excel file provided by the event coordinator to load the draw results.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
