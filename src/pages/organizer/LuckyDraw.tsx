@@ -161,8 +161,7 @@ export default function LuckyDraw() {
       }
     } catch {}
 
-    if (isRiggedMode && !riggedOverride) return
-    if (!isRiggedMode && pool.length === 0) return
+    if (!riggedOverride && pool.length === 0) return
 
     let winnerId: string
     let displayName: string
@@ -322,8 +321,8 @@ export default function LuckyDraw() {
 
   const activeWinners = winners.filter(w => !w.redrawn)
   const nextRank = nextPrizeRank(activeWinners.map(w => w.prize_rank))
-  const canDraw = (riggedEnabled ? riggedHasNext : pool.length > 0) && !drawing
-  const canRedraw = riggedEnabled ? riggedHasNext : pool.length > 0
+  const canDraw = (riggedHasNext || pool.length > 0) && !drawing
+  const canRedraw = riggedHasNext || pool.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -517,8 +516,8 @@ export default function LuckyDraw() {
           </div>
         )}
 
-        {!canRedraw && winners.some(w => !w.redrawn) && (
-          <p className="text-center text-amber-600 text-sm">No eligible visitors remaining — reset to draw again.</p>
+        {!canRedraw && (
+          <p className="text-center text-amber-600 text-sm">Lucky draw is empty — reset to continue.</p>
         )}
 
       </div>
