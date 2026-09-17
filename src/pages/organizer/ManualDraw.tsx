@@ -104,7 +104,7 @@ export default function ManualDraw() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-primary text-white px-6 py-3 flex items-center justify-between">
-        <span className="font-semibold text-sm">Preset Draw</span>
+        <span className="font-semibold text-sm">Lucky Draw</span>
         <Link to="/organizer/draw" className="text-xs opacity-75 hover:opacity-100">← Live Draw</Link>
       </nav>
 
