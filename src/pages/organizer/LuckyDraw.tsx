@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { buildCandidates, nextPrizeRank, type Candidate } from '../../lib/luckyDraw'
-import { fairDraw, checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
+import { nextPrizeRank, type Candidate } from '../../lib/luckyDraw'
+import { fairDraw } from '../../lib/eligibility'
 import { downloadExcel } from '../../lib/export'
 
 type SnapshotRow = {
@@ -52,19 +52,15 @@ export default function LuckyDraw() {
   const [pool, setPool] = useState<Candidate[]>([])
   const [snapshot, setSnapshot] = useState<SnapshotRow[]>([])
   const [winners, setWinners] = useState<WinnerRow[]>([])
-  const [poolBuilt, setPoolBuilt] = useState(false)
-  const [building, setBuilding] = useState(false)
   const [drawing, setDrawing] = useState(false)
+  const [spinning, setSpinning] = useState(false)
+  const [displayedName, setDisplayedName] = useState('')
   const [newWinnerId, setNewWinnerId] = useState<string | null>(null)
   const [celebrationWinner, setCelebrationWinner] = useState<WinnerRow | null>(null)
   const [resetConfirm, setResetConfirm] = useState(false)
   const [error, setError] = useState('')
-  const [manualSearch, setManualSearch] = useState('')
-  const [manualResults, setManualResults] = useState<Array<{ id: string; name: string; email: string; company_name: string; designation: string }>>([])
-  const [manualSearching, setManualSearching] = useState(false)
-  const [manualAdding, setManualAdding] = useState<Set<string>>(new Set())
+  const spinRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Auto-dismiss celebration after 5 seconds
   useEffect(() => {
     if (!celebrationWinner) return
     const timer = setTimeout(() => setCelebrationWinner(null), 5000)
@@ -102,6 +98,15 @@ export default function LuckyDraw() {
   useEffect(() => {
     loadWinners()
 
+    supabase
+      .from('lucky_draw_eligible_snapshot')
+      .select('id, visitor_id, name, email, mobile, company_name, designation, days_visited, halls_covered, platinum_visits, social_complete')
+      .then(({ data }) => {
+        const rows = (data ?? []) as SnapshotRow[]
+        setSnapshot(rows)
+        setPool(rows.map(r => ({ id: r.visitor_id, name: r.name, email: r.email })))
+      })
+
     const channel = supabase
       .channel('lucky-draw-winners')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lucky_draw_winners' }, () => {
@@ -109,102 +114,11 @@ export default function LuckyDraw() {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  async function buildPool() {
-    setBuilding(true)
-    setError('')
-    try {
-      const [visitsRes, profilesRes, exhibitorsRes, settingsRes] = await Promise.all([
-        supabase.from('visits').select('visitor_id, exhibitor_id, day, exhibitors(hall)'),
-        supabase.from('profiles').select('id, name, email, mobile, company_name, designation, social_linkedin, social_instagram, social_facebook, social_youtube').eq('role', 'visitor'),
-        supabase.from('exhibitors').select('id, hall, is_platinum'),
-        supabase.from('settings').select('key, value').in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins']),
-      ])
-
-      if (visitsRes.error) throw new Error(visitsRes.error.message)
-      if (profilesRes.error) throw new Error(profilesRes.error.message)
-      if (exhibitorsRes.error) throw new Error(exhibitorsRes.error.message)
-
-      const settingsRows = (settingsRes.data ?? []) as Array<{ key: string; value: string }>
-      const settingsMap = new Map(settingsRows.map(r => [r.key, r.value]))
-      const config: EligibilityConfig = {
-        minQualifyingDays: Number(settingsMap.get('min_qualifying_days') ?? 2),
-        minPlatinumVisits: Number(settingsMap.get('min_platinum_visits') ?? 3),
-        minTotalCheckins: Number(settingsMap.get('min_total_checkins') ?? 0),
-      }
-
-      const allExhibitors = (exhibitorsRes.data ?? []) as Array<{ id: string; hall: string; is_platinum: boolean }>
-      const platinumIds = new Set(allExhibitors.filter(e => e.is_platinum).map(e => e.id))
-      const exhibitorHallMap = new Map(allExhibitors.map(e => [e.id, e.hall]))
-
-      type RawVisit = { visitor_id: string; exhibitor_id: string; day: 1|2|3; exhibitors: { hall: string } | null }
-      const rawVisits = (visitsRes.data ?? []) as unknown as RawVisit[]
-      const flatVisits = rawVisits.map(v => ({
-        visitor_id: v.visitor_id,
-        exhibitor_id: v.exhibitor_id,
-        day: v.day,
-        hall: v.exhibitors?.hall ?? exhibitorHallMap.get(v.exhibitor_id) ?? '',
-      }))
-
-      type ProfileRow = {
-        id: string; name: string; email: string; mobile: string
-        company_name: string; designation: string
-        social_linkedin: boolean; social_instagram: boolean
-        social_facebook: boolean; social_youtube: boolean
-      }
-      const profiles = (profilesRes.data ?? []) as ProfileRow[]
-
-      const profileMap = new Map(profiles.map(p => [p.id, { name: p.name, email: p.email }]))
-      const socialByVisitor = new Map(profiles.map(p => [
-        p.id,
-        p.social_linkedin && p.social_instagram && p.social_facebook && p.social_youtube,
-      ]))
-
-      const byVisitor = new Map<string, Array<{ exhibitor_id: string; hall: string; day: 1|2|3 }>>()
-      for (const v of flatVisits) {
-        if (!byVisitor.has(v.visitor_id)) byVisitor.set(v.visitor_id, [])
-        byVisitor.get(v.visitor_id)!.push({ exhibitor_id: v.exhibitor_id, hall: v.hall, day: v.day })
-      }
-
-      const snapshotRows: Omit<SnapshotRow, 'id'>[] = []
-      const candidates = buildCandidates(flatVisits, profileMap, platinumIds, socialByVisitor, config)
-
-      for (const c of candidates) {
-        const visits = byVisitor.get(c.id) ?? []
-        const result = checkEligibility({ visits, platinumIds, socialComplete: socialByVisitor.get(c.id) ?? false, config })
-        const profile = profiles.find(p => p.id === c.id)
-        snapshotRows.push({
-          visitor_id: c.id,
-          name: c.name,
-          email: profile?.email ?? '',
-          mobile: profile?.mobile ?? '',
-          company_name: profile?.company_name ?? '',
-          designation: profile?.designation ?? '',
-          days_visited: result.daysVisited,
-          halls_covered: result.hallsCovered.join(', '),
-          platinum_visits: result.platinumVisits,
-          social_complete: result.eligible,
-        })
-      }
-
-      await supabase.from('lucky_draw_eligible_snapshot').delete().gte('created_at', '1970-01-01')
-      if (snapshotRows.length > 0) {
-        const { error: insertErr } = await supabase.from('lucky_draw_eligible_snapshot').insert(snapshotRows)
-        if (insertErr) throw new Error(insertErr.message)
-      }
-
-      const { data: freshSnap } = await supabase.from('lucky_draw_eligible_snapshot').select('*')
-      setSnapshot((freshSnap ?? []) as SnapshotRow[])
-      setPool(candidates)
-      setPoolBuilt(true)
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setBuilding(false)
+    return () => {
+      supabase.removeChannel(channel)
+      if (spinRef.current) clearInterval(spinRef.current)
     }
-  }
+  }, [])
 
   async function runDraw() {
     const activeWinners = winners.filter(w => !w.redrawn)
@@ -222,59 +136,82 @@ export default function LuckyDraw() {
 
     if (!riggedOverride && pool.length === 0) return
 
+    let winnerId: string
+    let displayName: string
+    let displayEmail: string
+    let displayCompany: string
+    let displayDesignation: string
+
+    if (riggedOverride) {
+      winnerId = riggedOverride.visitor_id
+      displayName = riggedOverride.name
+      displayCompany = riggedOverride.company
+      displayDesignation = riggedOverride.designation
+      displayEmail = snapshot.find(s => s.visitor_id === riggedOverride!.visitor_id)?.email ?? ''
+    } else {
+      winnerId = fairDraw(pool)
+      const winnerCandidate = pool.find(c => c.id === winnerId)!
+      const profile = snapshot.find(s => s.visitor_id === winnerId)
+      displayName = winnerCandidate.name
+      displayEmail = winnerCandidate.email
+      displayCompany = profile?.company_name ?? ''
+      displayDesignation = profile?.designation ?? ''
+    }
+
     setDrawing(true)
     setError('')
-    try {
-      let winnerId: string
-      let displayName: string
-      let displayEmail: string
-      let displayCompany: string
-      let displayDesignation: string
+    setSpinning(true)
 
-      if (riggedOverride) {
-        winnerId = riggedOverride.visitor_id
-        displayName = riggedOverride.name
-        displayCompany = riggedOverride.company
-        displayDesignation = riggedOverride.designation
-        displayEmail = snapshot.find(s => s.visitor_id === riggedOverride!.visitor_id)?.email ?? ''
-      } else {
-        winnerId = fairDraw(pool)
-        const winnerCandidate = pool.find(c => c.id === winnerId)!
-        const profile = snapshot.find(s => s.visitor_id === winnerId)
-        displayName = winnerCandidate.name
-        displayEmail = winnerCandidate.email
-        displayCompany = profile?.company_name ?? ''
-        displayDesignation = profile?.designation ?? ''
-      }
+    const spinNames = pool.length > 0 ? pool.map(c => c.name) : [displayName]
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('lucky_draw_winners')
-        .insert({ visitor_id: winnerId, prize_rank: next, redrawn: false })
-        .select('id')
-        .single()
-
-      if (insertErr) throw new Error(insertErr.message)
-
-      const newWinner: WinnerRow = {
-        id: (inserted as { id: string }).id,
-        visitor_id: winnerId,
-        prize_rank: next,
-        redrawn: false,
-        name: displayName,
-        email: displayEmail,
-        company_name: displayCompany,
-        designation: displayDesignation,
-      }
-
-      setWinners(prev => [...prev, newWinner].sort((a, b) => a.prize_rank - b.prize_rank))
-      setPool(prev => prev.filter(c => c.id !== winnerId))
-      setNewWinnerId((inserted as { id: string }).id)
-      setCelebrationWinner(newWinner)
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setDrawing(false)
+    function startPhase(speed: number) {
+      if (spinRef.current) clearInterval(spinRef.current)
+      spinRef.current = setInterval(() => {
+        setDisplayedName(spinNames[Math.floor(Math.random() * spinNames.length)])
+      }, speed)
     }
+
+    startPhase(60)
+    setTimeout(() => startPhase(120), 1200)
+    setTimeout(() => startPhase(220), 2000)
+    setTimeout(() => startPhase(380), 2800)
+    setTimeout(() => startPhase(600), 3300)
+
+    setTimeout(async () => {
+      if (spinRef.current) { clearInterval(spinRef.current); spinRef.current = null }
+      setDisplayedName(displayName)
+      setSpinning(false)
+
+      try {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('lucky_draw_winners')
+          .insert({ visitor_id: winnerId, prize_rank: next, redrawn: false })
+          .select('id')
+          .single()
+
+        if (insertErr) throw new Error(insertErr.message)
+
+        const newWinner: WinnerRow = {
+          id: (inserted as { id: string }).id,
+          visitor_id: winnerId,
+          prize_rank: next,
+          redrawn: false,
+          name: displayName,
+          email: displayEmail,
+          company_name: displayCompany,
+          designation: displayDesignation,
+        }
+
+        setWinners(prev => [...prev, newWinner].sort((a, b) => a.prize_rank - b.prize_rank))
+        setPool(prev => prev.filter(c => c.id !== winnerId))
+        setNewWinnerId((inserted as { id: string }).id)
+        setCelebrationWinner(newWinner)
+      } catch (e) {
+        setError(String(e))
+      } finally {
+        setDrawing(false)
+      }
+    }, 3800)
   }
 
   async function redraw(winner: WinnerRow) {
@@ -284,9 +221,7 @@ export default function LuckyDraw() {
       .eq('id', winner.id)
     if (updateErr) { console.error('[redraw]', updateErr); setError(updateErr.message); return }
     setWinners(prev => prev.map(w => w.id === winner.id ? { ...w, redrawn: true } : w))
-    if (poolBuilt) {
-      setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
-    }
+    setPool(prev => [...prev, { id: winner.visitor_id, name: winner.name, email: winner.email }])
   }
 
   async function resetDraw() {
@@ -305,59 +240,6 @@ export default function LuckyDraw() {
     setNewWinnerId(null)
     setCelebrationWinner(null)
     setResetConfirm(false)
-  }
-
-  async function searchVisitors() {
-    if (!manualSearch.trim()) return
-    setManualSearching(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, email, company_name, designation')
-      .eq('role', 'visitor')
-      .or(`name.ilike.%${manualSearch.trim()}%,email.ilike.%${manualSearch.trim()}%`)
-      .limit(8)
-    setManualResults((data ?? []) as Array<{ id: string; name: string; email: string; company_name: string; designation: string }>)
-    setManualSearching(false)
-  }
-
-  async function manualAddToPool(v: { id: string; name: string; email: string; company_name: string; designation: string }) {
-    setManualAdding(prev => new Set(prev).add(v.id))
-    setError('')
-    try {
-      const { error: insertErr } = await supabase
-        .from('lucky_draw_eligible_snapshot')
-        .insert({
-          visitor_id: v.id,
-          name: v.name,
-          email: v.email,
-          mobile: '',
-          company_name: v.company_name,
-          designation: v.designation,
-          days_visited: 0,
-          halls_covered: 'Manual override',
-          platinum_visits: 0,
-          social_complete: false,
-        })
-      if (insertErr) { setError(insertErr.message); return }
-      setPool(prev => [...prev, { id: v.id, name: v.name, email: v.email }])
-      setSnapshot(prev => [...prev, {
-        id: crypto.randomUUID(),
-        visitor_id: v.id,
-        name: v.name,
-        email: v.email,
-        mobile: '',
-        company_name: v.company_name,
-        designation: v.designation,
-        days_visited: 0,
-        halls_covered: 'Manual override',
-        platinum_visits: 0,
-        social_complete: false,
-      }])
-      setPoolBuilt(true)
-      setManualResults(prev => prev.filter(r => r.id !== v.id))
-    } finally {
-      setManualAdding(prev => { const n = new Set(prev); n.delete(v.id); return n })
-    }
   }
 
   function enterFullscreen() {
@@ -396,11 +278,10 @@ export default function LuckyDraw() {
 
   const activeWinners = winners.filter(w => !w.redrawn)
   const nextRank = nextPrizeRank(activeWinners.map(w => w.prize_rank))
-  const canDraw = poolBuilt && pool.length > 0 && !drawing
+  const canDraw = pool.length > 0 && !drawing
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Celebration overlay */}
       {celebrationWinner && (
         <>
           <style>{`
@@ -457,106 +338,55 @@ export default function LuckyDraw() {
       <div className="max-w-2xl mx-auto p-6 space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Lucky Draw</h1>
-          {poolBuilt && (
+          {pool.length > 0 && (
             <span className="text-sm text-gray-500">{pool.length + activeWinners.length} eligible visitor{pool.length + activeWinners.length !== 1 ? 's' : ''}</span>
           )}
         </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
-        {/* Build pool */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-gray-900">Eligible Pool</p>
-            <p className="text-sm text-gray-500">
-              {poolBuilt ? `${pool.length + activeWinners.length} visitors qualify` : 'Build the pool before drawing'}
-            </p>
-          </div>
-          <button
-            onClick={buildPool}
-            disabled={building}
-            className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
-            {building ? 'Building…' : 'Build Eligible Pool'}
-          </button>
-        </div>
-
-        {/* Manual add */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <p className="font-semibold text-gray-900 text-sm">Add Visitor Manually</p>
-          <div className="flex gap-2">
-            <input
-              type="search"
-              placeholder="Search by name or email…"
-              value={manualSearch}
-              onChange={e => setManualSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') searchVisitors() }}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              onClick={searchVisitors}
-              disabled={manualSearching || !manualSearch.trim()}
-              className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-            >
-              {manualSearching ? '…' : 'Search'}
-            </button>
-          </div>
-          {manualResults.length > 0 && (
-            <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
-              {manualResults.map(v => {
-                const alreadyIn = pool.some(c => c.id === v.id) || winners.some(w => w.visitor_id === v.id && !w.redrawn)
-                const adding = manualAdding.has(v.id)
-                return (
-                  <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{v.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{v.email}{v.company_name ? ` · ${v.company_name}` : ''}</div>
-                    </div>
-                    <button
-                      onClick={() => manualAddToPool(v)}
-                      disabled={alreadyIn || adding}
-                      className={`ml-3 shrink-0 text-xs font-semibold px-3 py-1 rounded border transition-colors ${
-                        alreadyIn
-                          ? 'border-gray-200 text-gray-400 cursor-default'
-                          : 'bg-primary text-white border-primary hover:opacity-90 disabled:opacity-50'
-                      }`}
-                    >
-                      {adding ? '…' : alreadyIn ? 'In pool' : '+ Add'}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {manualResults.length === 0 && manualSearch && !manualSearching && (
-            <p className="text-xs text-gray-400">No results. Try a different name or email.</p>
-          )}
-        </div>
-
         {/* Draw controls */}
-        <div className="flex flex-wrap gap-3 justify-center">
-          <button
-            onClick={runDraw}
-            disabled={!canDraw}
-            className="px-8 py-3 bg-primary text-white font-bold rounded-xl text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-          >
-            {drawing ? 'Drawing…' : `Run Draw — ${rankLabel(nextRank)}`}
-          </button>
-          <button
-            onClick={enterFullscreen}
-            className="px-4 py-3 border border-gray-300 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50"
-          >
-            Fullscreen
-          </button>
-          {poolBuilt && (
+        {drawing ? (
+          <>
+            <style>{`
+              @keyframes flicker {
+                0%, 100% { opacity: 1; }
+                50%       { opacity: 0.55; }
+              }
+              .animate-flicker { animation: flicker 0.15s ease-in-out infinite; }
+            `}</style>
+            <div className="w-full min-h-[120px] bg-primary rounded-xl flex flex-col items-center justify-center p-6 text-center">
+              <div className="text-xs font-semibold text-white/70 uppercase tracking-widest mb-3">
+                {rankLabel(nextRank)}
+              </div>
+              <div className={`text-2xl font-bold text-white ${spinning ? 'animate-flicker' : ''}`}>
+                {displayedName || '…'}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap gap-3 justify-center">
+            <button
+              onClick={runDraw}
+              disabled={!canDraw}
+              className="px-8 py-3 bg-primary text-white font-bold rounded-xl text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+            >
+              {`Run Draw — ${rankLabel(nextRank)}`}
+            </button>
+            <button
+              onClick={enterFullscreen}
+              className="px-4 py-3 border border-gray-300 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50"
+            >
+              Fullscreen
+            </button>
             <button
               onClick={handleExport}
               className="px-4 py-3 border border-gray-300 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50"
             >
               Export
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Winners list */}
         {winners.length > 0 && (
@@ -621,7 +451,7 @@ export default function LuckyDraw() {
           </div>
         )}
 
-        {poolBuilt && pool.length === 0 && (
+        {pool.length === 0 && snapshot.length > 0 && (
           <p className="text-center text-gray-500 text-sm">No eligible visitors remaining in the pool.</p>
         )}
       </div>

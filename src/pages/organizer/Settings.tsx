@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { buildCandidates } from '../../lib/luckyDraw'
+import { checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
 
 export default function Settings() {
   const { signOut } = useAuth()
@@ -15,6 +17,14 @@ export default function Settings() {
   const [error, setError] = useState('')
   const [siteOpen, setSiteOpen] = useState(false)
   const [siteOpenSaving, setSiteOpenSaving] = useState(false)
+
+  const [poolCount, setPoolCount] = useState<number | null>(null)
+  const [poolBuilding, setPoolBuilding] = useState(false)
+  const [poolBuildError, setPoolBuildError] = useState('')
+  const [poolSearch, setPoolSearch] = useState('')
+  const [poolResults, setPoolResults] = useState<Array<{ id: string; name: string; email: string; company_name: string; designation: string }>>([])
+  const [poolSearching, setPoolSearching] = useState(false)
+  const [poolAdding, setPoolAdding] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     supabase
@@ -32,6 +42,12 @@ export default function Settings() {
         setOverrideDay(m.get('event_day_override_enabled') === 'true')
         setSiteOpen(m.get('registration_open') === 'true')
       })
+  }, [])
+
+  useEffect(() => {
+    supabase.from('lucky_draw_eligible_snapshot').select('id').then(({ data }) => {
+      setPoolCount((data ?? []).length)
+    })
   }, [])
 
   async function toggleSiteOpen() {
@@ -63,6 +79,123 @@ export default function Settings() {
       setTimeout(() => setSaved(false), 2000)
     }
     setSaving(false)
+  }
+
+  async function buildPool() {
+    setPoolBuilding(true)
+    setPoolBuildError('')
+    try {
+      const [visitsRes, profilesRes, exhibitorsRes, settingsRes] = await Promise.all([
+        supabase.from('visits').select('visitor_id, exhibitor_id, day, exhibitors(hall)'),
+        supabase.from('profiles').select('id, name, email, mobile, company_name, designation, social_linkedin, social_instagram, social_facebook, social_youtube').eq('role', 'visitor'),
+        supabase.from('exhibitors').select('id, hall, is_platinum'),
+        supabase.from('settings').select('key, value').in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins']),
+      ])
+      if (visitsRes.error) throw new Error(visitsRes.error.message)
+      if (profilesRes.error) throw new Error(profilesRes.error.message)
+      if (exhibitorsRes.error) throw new Error(exhibitorsRes.error.message)
+
+      const settingsRows = (settingsRes.data ?? []) as Array<{ key: string; value: string }>
+      const settingsMap = new Map(settingsRows.map(r => [r.key, r.value]))
+      const config: EligibilityConfig = {
+        minQualifyingDays: Number(settingsMap.get('min_qualifying_days') ?? 2),
+        minPlatinumVisits: Number(settingsMap.get('min_platinum_visits') ?? 3),
+        minTotalCheckins: Number(settingsMap.get('min_total_checkins') ?? 0),
+      }
+
+      const allExhibitors = (exhibitorsRes.data ?? []) as Array<{ id: string; hall: string; is_platinum: boolean }>
+      const platinumIds = new Set(allExhibitors.filter(e => e.is_platinum).map(e => e.id))
+      const exhibitorHallMap = new Map(allExhibitors.map(e => [e.id, e.hall]))
+
+      type RawVisit = { visitor_id: string; exhibitor_id: string; day: 1|2|3; exhibitors: { hall: string } | null }
+      const rawVisits = (visitsRes.data ?? []) as unknown as RawVisit[]
+      const flatVisits = rawVisits.map(v => ({
+        visitor_id: v.visitor_id,
+        exhibitor_id: v.exhibitor_id,
+        day: v.day,
+        hall: v.exhibitors?.hall ?? exhibitorHallMap.get(v.exhibitor_id) ?? '',
+      }))
+
+      type ProfileRow = {
+        id: string; name: string; email: string; mobile: string
+        company_name: string; designation: string
+        social_linkedin: boolean; social_instagram: boolean
+        social_facebook: boolean; social_youtube: boolean
+      }
+      const profiles = (profilesRes.data ?? []) as ProfileRow[]
+      const profileMap = new Map(profiles.map(p => [p.id, { name: p.name, email: p.email }]))
+      const socialByVisitor = new Map(profiles.map(p => [
+        p.id,
+        p.social_linkedin && p.social_instagram && p.social_facebook && p.social_youtube,
+      ]))
+      const byVisitor = new Map<string, Array<{ exhibitor_id: string; hall: string; day: 1|2|3 }>>()
+      for (const v of flatVisits) {
+        if (!byVisitor.has(v.visitor_id)) byVisitor.set(v.visitor_id, [])
+        byVisitor.get(v.visitor_id)!.push({ exhibitor_id: v.exhibitor_id, hall: v.hall, day: v.day })
+      }
+
+      const candidates = buildCandidates(flatVisits, profileMap, platinumIds, socialByVisitor, config)
+      const snapshotRows = candidates.map(c => {
+        const visits = byVisitor.get(c.id) ?? []
+        const result = checkEligibility({ visits, platinumIds, socialComplete: socialByVisitor.get(c.id) ?? false, config })
+        const profile = profiles.find(p => p.id === c.id)
+        return {
+          visitor_id: c.id,
+          name: c.name,
+          email: profile?.email ?? '',
+          mobile: profile?.mobile ?? '',
+          company_name: profile?.company_name ?? '',
+          designation: profile?.designation ?? '',
+          days_visited: result.daysVisited,
+          halls_covered: result.hallsCovered.join(', '),
+          platinum_visits: result.platinumVisits,
+          social_complete: result.eligible,
+        }
+      })
+
+      await supabase.from('lucky_draw_eligible_snapshot').delete().gte('created_at', '1970-01-01')
+      if (snapshotRows.length > 0) {
+        const { error: insertErr } = await supabase.from('lucky_draw_eligible_snapshot').insert(snapshotRows)
+        if (insertErr) throw new Error(insertErr.message)
+      }
+      setPoolCount(snapshotRows.length)
+    } catch (e) {
+      setPoolBuildError(String(e))
+    } finally {
+      setPoolBuilding(false)
+    }
+  }
+
+  async function searchPoolVisitors() {
+    if (!poolSearch.trim()) return
+    setPoolSearching(true)
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, email, company_name, designation')
+      .eq('role', 'visitor')
+      .or(`name.ilike.%${poolSearch.trim()}%,email.ilike.%${poolSearch.trim()}%`)
+      .limit(8)
+    setPoolResults((data ?? []) as Array<{ id: string; name: string; email: string; company_name: string; designation: string }>)
+    setPoolSearching(false)
+  }
+
+  async function manualAddToPool(v: { id: string; name: string; email: string; company_name: string; designation: string }) {
+    setPoolAdding(prev => new Set(prev).add(v.id))
+    setPoolBuildError('')
+    try {
+      const { error: insertErr } = await supabase
+        .from('lucky_draw_eligible_snapshot')
+        .insert({
+          visitor_id: v.id, name: v.name, email: v.email, mobile: '',
+          company_name: v.company_name, designation: v.designation,
+          days_visited: 0, halls_covered: 'Manual override', platinum_visits: 0, social_complete: false,
+        })
+      if (insertErr) { setPoolBuildError(insertErr.message); return }
+      setPoolCount(prev => (prev ?? 0) + 1)
+      setPoolResults(prev => prev.filter(r => r.id !== v.id))
+    } finally {
+      setPoolAdding(prev => { const n = new Set(prev); n.delete(v.id); return n })
+    }
   }
 
   return (
@@ -198,6 +331,73 @@ export default function Settings() {
             {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Settings'}
           </button>
         </form>
+
+        {/* Draw Pool */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-800">Draw Pool</h2>
+            <span className="text-sm text-gray-500">
+              {poolCount === null ? '…' : `${poolCount} visitor${poolCount !== 1 ? 's' : ''} in pool`}
+            </span>
+          </div>
+
+          {poolBuildError && <p className="text-sm text-red-600">{poolBuildError}</p>}
+
+          <button
+            onClick={buildPool}
+            disabled={poolBuilding}
+            className="w-full bg-primary text-white rounded-lg py-2.5 font-semibold text-sm disabled:opacity-50 hover:opacity-90"
+          >
+            {poolBuilding ? 'Building…' : 'Build Eligible Pool'}
+          </button>
+
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Add Visitor Manually</p>
+            <div className="flex gap-2">
+              <input
+                type="search"
+                placeholder="Search by name or email…"
+                value={poolSearch}
+                onChange={e => setPoolSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') searchPoolVisitors() }}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                onClick={searchPoolVisitors}
+                disabled={poolSearching || !poolSearch.trim()}
+                className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+              >
+                {poolSearching ? '…' : 'Search'}
+              </button>
+            </div>
+            {poolResults.length > 0 && (
+              <div className="mt-2 divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                {poolResults.map(v => {
+                  const adding = poolAdding.has(v.id)
+                  return (
+                    <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{v.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{v.email}{v.company_name ? ` · ${v.company_name}` : ''}</div>
+                      </div>
+                      <button
+                        onClick={() => manualAddToPool(v)}
+                        disabled={adding}
+                        className="ml-3 shrink-0 text-xs font-semibold px-3 py-1 rounded bg-primary text-white border-primary hover:opacity-90 disabled:opacity-50"
+                      >
+                        {adding ? '…' : '+ Add'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {poolResults.length === 0 && poolSearch && !poolSearching && (
+              <p className="text-xs text-gray-400 mt-2">No results. Try a different name or email.</p>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )
