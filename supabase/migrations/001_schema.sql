@@ -29,6 +29,6 @@ create table visits (
 create table lucky_draw_winners (
   id uuid primary key default gen_random_uuid(),
   visitor_id uuid not null references profiles(id) on delete cascade,
-  prize_rank smallint not null unique,
+  prize_rank smallint not null,
   drawn_at timestamptz default now()
 );

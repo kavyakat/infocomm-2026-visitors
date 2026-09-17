@@ -1,0 +1,1 @@
+alter table lucky_draw_winners drop constraint lucky_draw_winners_prize_rank_key;
