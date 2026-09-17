@@ -36,7 +36,6 @@ export default function ManualDraw() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -73,11 +72,9 @@ export default function ManualDraw() {
     load()
   }, [])
 
-  function save() {
-    persistConfig(enabled, picks, visitors)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
+  useEffect(() => {
+    if (!loading) persistConfig(enabled, picks, visitors)
+  }, [enabled, picks, visitors])
 
   function assign(visitorId: string, position: number) {
     setPicks(prev => {
@@ -120,22 +117,14 @@ export default function ManualDraw() {
       <div className="max-w-2xl mx-auto p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">Select Winners</h2>
-          <div className="flex items-center gap-2">
+          {assignedCount > 0 && (
             <button
-              onClick={save}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90"
+              onClick={clearAll}
+              className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
             >
-              {saved ? 'Saved ✓' : 'Save'}
+              Clear All
             </button>
-            {assignedCount > 0 && (
-              <button
-                onClick={clearAll}
-                className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
         {assignedCount > 0 && (
@@ -150,6 +139,12 @@ export default function ManualDraw() {
             />
             Use selected winners for live draw
           </label>
+        )}
+
+        {enabled && assignedCount === 0 && (
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            "Use selected winners" is on but no positions are assigned — the live draw will use the regular eligible pool.
+          </p>
         )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
