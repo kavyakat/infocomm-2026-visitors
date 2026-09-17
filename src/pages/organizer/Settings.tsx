@@ -17,6 +17,7 @@ export default function Settings() {
   const [error, setError] = useState('')
   const [siteOpen, setSiteOpen] = useState(false)
   const [siteOpenSaving, setSiteOpenSaving] = useState(false)
+  const [animSeconds, setAnimSeconds] = useState(10)
 
   const [poolCount, setPoolCount] = useState<number | null>(null)
   const [poolBuilding, setPoolBuilding] = useState(false)
@@ -30,7 +31,7 @@ export default function Settings() {
     supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day', 'event_day_override_enabled', 'registration_open'])
+      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day', 'event_day_override_enabled', 'registration_open', 'draw_animation_seconds'])
       .then(({ data }) => {
         if (!data) return
         const m = new Map(data.map(r => [r.key, r.value]))
@@ -41,6 +42,7 @@ export default function Settings() {
         setEventDay((d >= 1 && d <= 3 ? d : 1) as 1 | 2 | 3)
         setOverrideDay(m.get('event_day_override_enabled') === 'true')
         setSiteOpen(m.get('registration_open') === 'true')
+        setAnimSeconds(Number(m.get('draw_animation_seconds') ?? 10))
       })
   }, [])
 
@@ -70,6 +72,7 @@ export default function Settings() {
       { key: 'min_total_checkins', value: String(minCheckins) },
       { key: 'current_event_day', value: String(eventDay) },
       { key: 'event_day_override_enabled', value: String(overrideDay) },
+      { key: 'draw_animation_seconds', value: String(animSeconds) },
     ])
 
     if (upsertErr) {
@@ -342,6 +345,21 @@ export default function Settings() {
           </div>
 
           {poolBuildError && <p className="text-sm text-red-600">{poolBuildError}</p>}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Draw animation duration (seconds)
+            </label>
+            <input
+              type="number"
+              min={3}
+              max={30}
+              value={animSeconds}
+              onChange={e => setAnimSeconds(Number(e.target.value))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="text-xs text-gray-400 mt-1">Slot-machine spin duration (3–30 s). Save Settings to apply.</p>
+          </div>
 
           <button
             onClick={buildPool}

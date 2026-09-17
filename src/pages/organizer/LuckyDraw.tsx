@@ -53,6 +53,7 @@ export default function LuckyDraw() {
   const [snapshot, setSnapshot] = useState<SnapshotRow[]>([])
   const [winners, setWinners] = useState<WinnerRow[]>([])
   const [drawing, setDrawing] = useState(false)
+  const [animDuration, setAnimDuration] = useState(10)
   const [spinning, setSpinning] = useState(false)
   const [displayedName, setDisplayedName] = useState('')
   const [newWinnerId, setNewWinnerId] = useState<string | null>(null)
@@ -97,6 +98,15 @@ export default function LuckyDraw() {
 
   useEffect(() => {
     loadWinners()
+
+    supabase
+      .from('settings')
+      .select('key, value')
+      .eq('key', 'draw_animation_seconds')
+      .then(({ data }) => {
+        const val = (data ?? []).find(r => r.key === 'draw_animation_seconds')?.value
+        if (val) setAnimDuration(Number(val))
+      })
 
     supabase
       .from('lucky_draw_eligible_snapshot')
@@ -172,10 +182,10 @@ export default function LuckyDraw() {
     }
 
     startPhase(60)
-    setTimeout(() => startPhase(120), 1200)
-    setTimeout(() => startPhase(220), 2000)
-    setTimeout(() => startPhase(380), 2800)
-    setTimeout(() => startPhase(600), 3300)
+    setTimeout(() => startPhase(120), Math.round(animDuration * 0.3158 * 1000))
+    setTimeout(() => startPhase(220), Math.round(animDuration * 0.5263 * 1000))
+    setTimeout(() => startPhase(380), Math.round(animDuration * 0.7368 * 1000))
+    setTimeout(() => startPhase(600), Math.round(animDuration * 0.8684 * 1000))
 
     setTimeout(async () => {
       if (spinRef.current) { clearInterval(spinRef.current); spinRef.current = null }
@@ -211,7 +221,7 @@ export default function LuckyDraw() {
       } finally {
         setDrawing(false)
       }
-    }, 3800)
+    }, Math.round(animDuration * 1000))
   }
 
   async function redraw(winner: WinnerRow) {
