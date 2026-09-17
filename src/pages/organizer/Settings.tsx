@@ -5,6 +5,17 @@ import { useAuth } from '../../hooks/useAuth'
 import { buildCandidates } from '../../lib/luckyDraw'
 import { checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
 
+type PoolMember = {
+  id: string
+  visitor_id: string
+  name: string
+  email: string
+  company_name: string
+  designation: string
+  manually_added: boolean
+  excluded: boolean
+}
+
 export default function Settings() {
   const { signOut } = useAuth()
   const [minDays, setMinDays] = useState(2)
@@ -19,13 +30,30 @@ export default function Settings() {
   const [siteOpenSaving, setSiteOpenSaving] = useState(false)
   const [animSeconds, setAnimSeconds] = useState(10)
 
-  const [poolCount, setPoolCount] = useState<number | null>(null)
+  const [poolMembers, setPoolMembers] = useState<PoolMember[]>([])
+  const [poolMembersLoaded, setPoolMembersLoaded] = useState(false)
   const [poolBuilding, setPoolBuilding] = useState(false)
   const [poolBuildError, setPoolBuildError] = useState('')
   const [poolSearch, setPoolSearch] = useState('')
   const [poolResults, setPoolResults] = useState<Array<{ id: string; name: string; email: string; company_name: string; designation: string }>>([])
   const [poolSearching, setPoolSearching] = useState(false)
   const [poolAdding, setPoolAdding] = useState<Set<string>>(new Set())
+  const [poolRemoving, setPoolRemoving] = useState<Set<string>>(new Set())
+
+  const activePoolCount = poolMembersLoaded ? poolMembers.filter(m => !m.excluded).length : null
+
+  function parsePoolRows(rows: Array<Record<string, unknown>>): PoolMember[] {
+    return rows.map(r => ({
+      id: r.id as string,
+      visitor_id: r.visitor_id as string,
+      name: (r.name as string) ?? '',
+      email: (r.email as string) ?? '',
+      company_name: (r.company_name as string) ?? '',
+      designation: (r.designation as string) ?? '',
+      manually_added: (r.manually_added as boolean) ?? false,
+      excluded: (r.excluded as boolean) ?? false,
+    }))
+  }
 
   useEffect(() => {
     supabase
@@ -47,9 +75,26 @@ export default function Settings() {
   }, [])
 
   useEffect(() => {
-    supabase.from('lucky_draw_eligible_snapshot').select('id').then(({ data }) => {
-      setPoolCount((data ?? []).length)
-    })
+    supabase
+      .from('lucky_draw_eligible_snapshot')
+      .select('id, visitor_id, name, email, company_name, designation, manually_added, excluded')
+      .order('name')
+      .then(({ data, error: err }) => {
+        if (err) {
+          // New columns may not exist yet — fall back without them
+          supabase
+            .from('lucky_draw_eligible_snapshot')
+            .select('id, visitor_id, name, email, company_name, designation')
+            .order('name')
+            .then(({ data: fb }) => {
+              setPoolMembers(parsePoolRows((fb ?? []) as Array<Record<string, unknown>>))
+              setPoolMembersLoaded(true)
+            })
+          return
+        }
+        setPoolMembers(parsePoolRows((data ?? []) as Array<Record<string, unknown>>))
+        setPoolMembersLoaded(true)
+      })
   }, [])
 
   async function toggleSiteOpen() {
@@ -160,11 +205,40 @@ export default function Settings() {
         const { error: insertErr } = await supabase.from('lucky_draw_eligible_snapshot').insert(snapshotRows)
         if (insertErr) throw new Error(insertErr.message)
       }
-      setPoolCount(snapshotRows.length)
+
+      const { data: refreshed } = await supabase
+        .from('lucky_draw_eligible_snapshot')
+        .select('id, visitor_id, name, email, company_name, designation, manually_added, excluded')
+        .order('name')
+      setPoolMembers(parsePoolRows((refreshed ?? []) as Array<Record<string, unknown>>))
     } catch (e) {
       setPoolBuildError(String(e))
     } finally {
       setPoolBuilding(false)
+    }
+  }
+
+  async function removeFromPool(member: PoolMember) {
+    setPoolRemoving(prev => new Set(prev).add(member.id))
+    setPoolBuildError('')
+    try {
+      if (member.manually_added) {
+        const { error: delErr } = await supabase
+          .from('lucky_draw_eligible_snapshot')
+          .delete()
+          .eq('id', member.id)
+        if (delErr) { setPoolBuildError(delErr.message); return }
+        setPoolMembers(prev => prev.filter(m => m.id !== member.id))
+      } else {
+        const { error: upErr } = await supabase
+          .from('lucky_draw_eligible_snapshot')
+          .update({ excluded: true })
+          .eq('id', member.id)
+        if (upErr) { setPoolBuildError(upErr.message); return }
+        setPoolMembers(prev => prev.map(m => m.id === member.id ? { ...m, excluded: true } : m))
+      }
+    } finally {
+      setPoolRemoving(prev => { const n = new Set(prev); n.delete(member.id); return n })
     }
   }
 
@@ -185,20 +259,38 @@ export default function Settings() {
     setPoolAdding(prev => new Set(prev).add(v.id))
     setPoolBuildError('')
     try {
-      const { error: insertErr } = await supabase
+      const { data: inserted, error: insertErr } = await supabase
         .from('lucky_draw_eligible_snapshot')
         .insert({
           visitor_id: v.id, name: v.name, email: v.email, mobile: '',
           company_name: v.company_name, designation: v.designation,
-          days_visited: 0, halls_covered: 'Manual override', platinum_visits: 0, social_complete: false,
+          days_visited: 0, halls_covered: 'Manual override', platinum_visits: 0,
+          social_complete: false, manually_added: true, excluded: false,
         })
+        .select('id')
+        .single()
       if (insertErr) { setPoolBuildError(insertErr.message); return }
-      setPoolCount(prev => (prev ?? 0) + 1)
+      const newMember: PoolMember = {
+        id: (inserted as { id: string }).id,
+        visitor_id: v.id,
+        name: v.name,
+        email: v.email,
+        company_name: v.company_name,
+        designation: v.designation,
+        manually_added: true,
+        excluded: false,
+      }
+      setPoolMembers(prev => [...prev, newMember].sort((a, b) => a.name.localeCompare(b.name)))
       setPoolResults(prev => prev.filter(r => r.id !== v.id))
     } finally {
       setPoolAdding(prev => { const n = new Set(prev); n.delete(v.id); return n })
     }
   }
+
+  const sortedMembers = [
+    ...poolMembers.filter(m => !m.excluded),
+    ...poolMembers.filter(m => m.excluded),
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -332,7 +424,7 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-800">Draw Pool</h2>
             <span className="text-sm text-gray-500">
-              {poolCount === null ? '…' : `${poolCount} visitor${poolCount !== 1 ? 's' : ''} in pool`}
+              {activePoolCount === null ? '…' : `${activePoolCount} visitor${activePoolCount !== 1 ? 's' : ''} in pool`}
             </span>
           </div>
 
@@ -360,6 +452,54 @@ export default function Settings() {
           >
             {poolBuilding ? 'Building…' : 'Build Eligible Pool'}
           </button>
+
+          {poolMembersLoaded && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Pool Members</p>
+              {sortedMembers.length === 0 ? (
+                <p className="text-xs text-gray-400">Pool is empty — click Build Eligible Pool to populate it.</p>
+              ) : (
+                <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+                  {sortedMembers.map(m => {
+                    const removing = poolRemoving.has(m.id)
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex items-center justify-between px-3 py-2.5 ${m.excluded ? 'opacity-50' : ''}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-sm font-medium text-gray-900 truncate ${m.excluded ? 'line-through' : ''}`}>
+                              {m.name}
+                            </span>
+                            {m.manually_added && !m.excluded && (
+                              <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                Added
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 truncate">
+                            {m.email}{m.company_name ? ` · ${m.company_name}` : ''}
+                          </div>
+                        </div>
+                        {m.excluded ? (
+                          <span className="ml-3 shrink-0 text-xs text-gray-400 font-medium">Removed</span>
+                        ) : (
+                          <button
+                            onClick={() => removeFromPool(m)}
+                            disabled={removing}
+                            className="ml-3 shrink-0 text-xs font-semibold px-2.5 py-1 rounded border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {removing ? '…' : 'Remove'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Add Visitor Manually</p>

@@ -117,6 +117,7 @@ export default function LuckyDraw() {
     supabase
       .from('lucky_draw_eligible_snapshot')
       .select('id, visitor_id, name, email, mobile, company_name, designation, days_visited, halls_covered, platinum_visits, social_complete')
+      .eq('excluded', false)
       .then(({ data }) => {
         const rows = (data ?? []) as SnapshotRow[]
         setSnapshot(rows)
