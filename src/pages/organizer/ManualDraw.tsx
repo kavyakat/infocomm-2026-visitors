@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
 type ManualWinner = {
@@ -26,7 +26,27 @@ function normalize(s: string): string {
 
 export default function ManualDraw() {
   const [winners, setWinners] = useState<ManualWinner[]>([])
+  const [enabled, setEnabled] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('manualDrawConfig')
+      if (raw) {
+        const cfg = JSON.parse(raw) as { enabled: boolean; winners: ManualWinner[] }
+        if (cfg.winners?.length > 0) {
+          setWinners(cfg.winners)
+          setEnabled(cfg.enabled ?? false)
+        }
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (winners.length > 0) {
+      localStorage.setItem('manualDrawConfig', JSON.stringify({ enabled, winners }))
+    }
+  }, [enabled, winners])
 
   function downloadSample() {
     import('xlsx').then(XLSX => {
@@ -47,6 +67,7 @@ export default function ManualDraw() {
     if (!file) return
     setError('')
     setWinners([])
+    setEnabled(false)
 
     const reader = new FileReader()
     reader.onload = async ev => {
@@ -134,12 +155,21 @@ export default function ManualDraw() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
               <button
-                onClick={() => setWinners([])}
+                onClick={() => { setWinners([]); setEnabled(false); localStorage.removeItem('manualDrawConfig') }}
                 className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
               >
                 Clear
               </button>
             </div>
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={e => setEnabled(e.target.checked)}
+                className="rounded accent-primary"
+              />
+              Use this list for the live draw
+            </label>
             {winners.map(w => (
               <div key={w.position} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
                 <span className="text-3xl">{rankBadge(w.position)}</span>

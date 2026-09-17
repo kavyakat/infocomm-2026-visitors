@@ -218,6 +218,28 @@ export default function LuckyDraw() {
       const winnerId = fairDraw(pool)
       const winnerCandidate = pool.find(c => c.id === winnerId)!
 
+      const profile = snapshot.find(s => s.visitor_id === winnerId)
+      let displayName = winnerCandidate.name
+      let displayEmail = winnerCandidate.email
+      let displayCompany = profile?.company_name ?? ''
+      let displayDesignation = profile?.designation ?? ''
+
+      try {
+        const raw = localStorage.getItem('manualDrawConfig')
+        if (raw) {
+          const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number; name: string; designation: string; company: string }> }
+          if (cfg.enabled) {
+            const override = cfg.winners.find(w => w.position === next)
+            if (override) {
+              displayName = override.name
+              displayEmail = ''
+              displayCompany = override.company
+              displayDesignation = override.designation
+            }
+          }
+        }
+      } catch {}
+
       const { data: inserted, error: insertErr } = await supabase
         .from('lucky_draw_winners')
         .insert({ visitor_id: winnerId, prize_rank: next, redrawn: false })
@@ -226,16 +248,15 @@ export default function LuckyDraw() {
 
       if (insertErr) throw new Error(insertErr.message)
 
-      const profile = snapshot.find(s => s.visitor_id === winnerId)
       const newWinner: WinnerRow = {
         id: (inserted as { id: string }).id,
         visitor_id: winnerId,
         prize_rank: next,
         redrawn: false,
-        name: winnerCandidate.name,
-        email: winnerCandidate.email,
-        company_name: profile?.company_name ?? '',
-        designation: profile?.designation ?? '',
+        name: displayName,
+        email: displayEmail,
+        company_name: displayCompany,
+        designation: displayDesignation,
       }
 
       setWinners(prev => [...prev, newWinner].sort((a, b) => a.prize_rank - b.prize_rank))
