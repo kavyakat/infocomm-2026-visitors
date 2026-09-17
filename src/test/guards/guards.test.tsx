@@ -41,7 +41,7 @@ function makeProfile(role: 'visitor' | 'organizer'): Profile {
   return {
     id: 'u1', name: 'Test User', email: 'test@test.com', mobile: '',
     role, company_name: '', designation: '',
-    social_linkedin: false, social_instagram: false, social_facebook: false,
+    social_linkedin: false, social_instagram: false, social_facebook: false, social_youtube: false,
   }
 }
 
