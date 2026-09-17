@@ -151,7 +151,10 @@ export default function LuckyDraw() {
       const raw = localStorage.getItem('manualDrawConfig')
       if (raw) {
         const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number } & RiggedEntry> }
-        if (cfg.enabled) riggedOverride = cfg.winners.find(w => w.position === next) ?? null
+        if (cfg.enabled) {
+          const sorted = [...cfg.winners].sort((a, b) => a.position - b.position)
+          riggedOverride = sorted[winners.length] ?? null
+        }
       }
     } catch {}
 
