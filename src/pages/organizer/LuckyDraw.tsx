@@ -207,38 +207,45 @@ export default function LuckyDraw() {
   }
 
   async function runDraw() {
-    if (pool.length === 0) return
-
     const activeWinners = winners.filter(w => !w.redrawn)
     const next = nextPrizeRank(activeWinners.map(w => w.prize_rank))
+
+    type RiggedEntry = { visitor_id: string; name: string; company: string; designation: string }
+    let riggedOverride: RiggedEntry | null = null
+    try {
+      const raw = localStorage.getItem('manualDrawConfig')
+      if (raw) {
+        const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number } & RiggedEntry> }
+        if (cfg.enabled) riggedOverride = cfg.winners.find(w => w.position === next) ?? null
+      }
+    } catch {}
+
+    if (!riggedOverride && pool.length === 0) return
 
     setDrawing(true)
     setError('')
     try {
-      const winnerId = fairDraw(pool)
-      const winnerCandidate = pool.find(c => c.id === winnerId)!
+      let winnerId: string
+      let displayName: string
+      let displayEmail: string
+      let displayCompany: string
+      let displayDesignation: string
 
-      const profile = snapshot.find(s => s.visitor_id === winnerId)
-      let displayName = winnerCandidate.name
-      let displayEmail = winnerCandidate.email
-      let displayCompany = profile?.company_name ?? ''
-      let displayDesignation = profile?.designation ?? ''
-
-      try {
-        const raw = localStorage.getItem('manualDrawConfig')
-        if (raw) {
-          const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number; name: string; designation: string; company: string }> }
-          if (cfg.enabled) {
-            const override = cfg.winners.find(w => w.position === next)
-            if (override) {
-              displayName = override.name
-              displayEmail = ''
-              displayCompany = override.company
-              displayDesignation = override.designation
-            }
-          }
-        }
-      } catch {}
+      if (riggedOverride) {
+        winnerId = riggedOverride.visitor_id
+        displayName = riggedOverride.name
+        displayCompany = riggedOverride.company
+        displayDesignation = riggedOverride.designation
+        displayEmail = snapshot.find(s => s.visitor_id === riggedOverride!.visitor_id)?.email ?? ''
+      } else {
+        winnerId = fairDraw(pool)
+        const winnerCandidate = pool.find(c => c.id === winnerId)!
+        const profile = snapshot.find(s => s.visitor_id === winnerId)
+        displayName = winnerCandidate.name
+        displayEmail = winnerCandidate.email
+        displayCompany = profile?.company_name ?? ''
+        displayDesignation = profile?.designation ?? ''
+      }
 
       const { data: inserted, error: insertErr } = await supabase
         .from('lucky_draw_winners')

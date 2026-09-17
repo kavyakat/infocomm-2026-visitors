@@ -1,126 +1,104 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 
-type ManualWinner = {
-  position: 1 | 2 | 3
+type VisitorRow = {
+  id: string
   name: string
+  company_name: string
   designation: string
+  visitCount: number
+}
+
+type ConfigWinner = {
+  position: number
+  visitor_id: string
+  name: string
   company: string
+  designation: string
 }
 
-function rankBadge(pos: number): string {
-  if (pos === 1) return '🥇'
-  if (pos === 2) return '🥈'
-  return '🥉'
-}
+const POSITIONS = [1, 2, 3] as const
+const LABELS: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd' }
 
-function rankLabel(pos: number): string {
-  if (pos === 1) return '1st Prize'
-  if (pos === 2) return '2nd Prize'
-  return '3rd Prize'
-}
-
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[\s_-]+/g, '')
+function persistConfig(enabled: boolean, picks: Record<string, number>, visitors: VisitorRow[]) {
+  const winners: ConfigWinner[] = Object.entries(picks).map(([vid, pos]) => {
+    const v = visitors.find(r => r.id === vid)
+    return { position: pos, visitor_id: vid, name: v?.name ?? '', company: v?.company_name ?? '', designation: v?.designation ?? '' }
+  })
+  localStorage.setItem('manualDrawConfig', JSON.stringify({ enabled, winners }))
 }
 
 export default function ManualDraw() {
-  const [winners, setWinners] = useState<ManualWinner[]>([])
+  const [visitors, setVisitors] = useState<VisitorRow[]>([])
+  const [picks, setPicks] = useState<Record<string, number>>({})
   const [enabled, setEnabled] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('manualDrawConfig')
-      if (raw) {
-        const cfg = JSON.parse(raw) as { enabled: boolean; winners: ManualWinner[] }
-        if (cfg.winners?.length > 0) {
-          setWinners(cfg.winners)
+    async function load() {
+      const [profilesRes, visitsRes] = await Promise.all([
+        supabase.from('profiles').select('id, name, company_name, designation').eq('role', 'visitor'),
+        supabase.from('visits').select('visitor_id'),
+      ])
+      if (profilesRes.error) { setError(profilesRes.error.message); setLoading(false); return }
+
+      const countMap = new Map<string, number>()
+      for (const v of (visitsRes.data ?? []) as { visitor_id: string }[]) {
+        countMap.set(v.visitor_id, (countMap.get(v.visitor_id) ?? 0) + 1)
+      }
+
+      const rows = ((profilesRes.data ?? []) as { id: string; name: string; company_name: string; designation: string }[])
+        .map(p => ({ ...p, visitCount: countMap.get(p.id) ?? 0 }))
+        .sort((a, b) => b.visitCount - a.visitCount)
+
+      setVisitors(rows)
+
+      try {
+        const raw = localStorage.getItem('manualDrawConfig')
+        if (raw) {
+          const cfg = JSON.parse(raw) as { enabled: boolean; winners: ConfigWinner[] }
+          const restored: Record<string, number> = {}
+          for (const w of cfg.winners ?? []) restored[w.visitor_id] = w.position
+          setPicks(restored)
           setEnabled(cfg.enabled ?? false)
         }
-      }
-    } catch {}
+      } catch {}
+
+      setLoading(false)
+    }
+    load()
   }, [])
 
   useEffect(() => {
-    if (winners.length > 0) {
-      localStorage.setItem('manualDrawConfig', JSON.stringify({ enabled, winners }))
-    }
-  }, [enabled, winners])
+    if (Object.keys(picks).length > 0) persistConfig(enabled, picks, visitors)
+  }, [enabled, picks, visitors])
 
-  function downloadSample() {
-    import('xlsx').then(XLSX => {
-      const rows = [
-        { name: 'Priya Sharma', designation: 'Product Manager', company: 'Acme Tech', 'final-position': 1 },
-        { name: 'Ravi Kumar', designation: 'CTO', company: 'Beta Solutions', 'final-position': 2 },
-        { name: 'Anita Patel', designation: 'Director', company: 'Gamma Corp', 'final-position': '' },
-      ]
-      const ws = XLSX.utils.json_to_sheet(rows)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'PresetDraw')
-      XLSX.writeFile(wb, 'manual-draw-sample.xlsx')
+  function assign(visitorId: string, position: number) {
+    setPicks(prev => {
+      const next = { ...prev }
+      for (const [vid, pos] of Object.entries(next)) {
+        if (pos === position) delete next[vid]
+      }
+      if (prev[visitorId] !== position) next[visitorId] = position
+      return next
     })
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setError('')
-    setWinners([])
+  function clearAll() {
+    setPicks({})
     setEnabled(false)
-
-    const reader = new FileReader()
-    reader.onload = async ev => {
-      try {
-        const XLSX = await import('xlsx')
-        const data = new Uint8Array(ev.target!.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        if (!ws) { setError('No sheet found in the file.'); return }
-
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
-        if (raw.length === 0) { setError('The file has no data rows.'); return }
-
-        const headerKeys = Object.keys(raw[0])
-        const find = (target: string) =>
-          headerKeys.find(k => normalize(k) === normalize(target))
-
-        const nameKey = find('name')
-        const desigKey = find('designation')
-        const compKey = find('company')
-        const posKey = find('final-position')
-
-        if (!nameKey || !desigKey || !compKey || !posKey) {
-          setError('Required columns not found. Please use the sample file as a template.')
-          return
-        }
-
-        const parsed: ManualWinner[] = []
-        for (const row of raw) {
-          const pos = Number(row[posKey])
-          if (pos === 1 || pos === 2 || pos === 3) {
-            parsed.push({
-              position: pos as 1 | 2 | 3,
-              name: String(row[nameKey] ?? '').trim(),
-              designation: String(row[desigKey] ?? '').trim(),
-              company: String(row[compKey] ?? '').trim(),
-            })
-          }
-        }
-
-        if (parsed.length === 0) {
-          setError('No draw results found in the file. Please check the file and try again.')
-          return
-        }
-
-        setWinners(parsed.sort((a, b) => a.position - b.position))
-      } catch {
-        setError('Could not parse the file. Make sure it is a valid .xlsx file.')
-      }
-    }
-    reader.readAsArrayBuffer(file)
-    e.target.value = ''
+    localStorage.removeItem('manualDrawConfig')
   }
+
+  const assignedCount = Object.keys(picks).length
+  const filtered = visitors.filter(v =>
+    !search.trim() ||
+    v.name.toLowerCase().includes(search.toLowerCase()) ||
+    v.company_name.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,59 +107,83 @@ export default function ManualDraw() {
         <Link to="/organizer/draw" className="text-xs opacity-75 hover:opacity-100">← Live Draw</Link>
       </nav>
 
-      <div className="max-w-xl mx-auto p-6 space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-gray-800">Upload Participant File</h2>
-          <p className="text-sm text-gray-500">
-            Upload the participant Excel file provided by the event coordinator to load the draw results.
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="max-w-2xl mx-auto p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">Select Winners</h2>
+          {assignedCount > 0 && (
             <button
-              onClick={downloadSample}
-              className="text-sm border border-gray-300 rounded-lg px-4 py-2 text-gray-700 hover:bg-gray-50 font-medium"
+              onClick={clearAll}
+              className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
             >
-              Download Sample Excel
+              Clear All
             </button>
-            <label className="text-sm bg-primary text-white rounded-lg px-4 py-2 font-medium cursor-pointer hover:opacity-90 text-center">
-              Upload .xlsx
-              <input type="file" accept=".xlsx" className="hidden" onChange={handleFile} />
-            </label>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          )}
         </div>
 
-        {winners.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
-              <button
-                onClick={() => { setWinners([]); setEnabled(false); localStorage.removeItem('manualDrawConfig') }}
-                className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
-              >
-                Clear
-              </button>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={e => setEnabled(e.target.checked)}
-                className="rounded accent-primary"
-              />
-              Use this list for the live draw
-            </label>
-            {winners.map(w => (
-              <div key={w.position} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
-                <span className="text-3xl">{rankBadge(w.position)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900">{w.name}</div>
-                  {w.company && (
-                    <div className="text-xs text-gray-400">{w.company}{w.designation ? ` · ${w.designation}` : ''}</div>
-                  )}
+        {assignedCount > 0 && (
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={e => {
+                const next = e.target.checked
+                setEnabled(next)
+                persistConfig(next, picks, visitors)
+              }}
+              className="rounded accent-primary"
+            />
+            Use selected winners for live draw
+          </label>
+        )}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <input
+          type="search"
+          placeholder="Search by name or company…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+
+        {loading ? (
+          <p className="text-sm text-gray-400 text-center py-8">Loading visitors…</p>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+            {filtered.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">No visitors found.</p>
+            )}
+            {filtered.map(v => {
+              const currentPos = picks[v.id]
+              return (
+                <div key={v.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{v.name}</div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {v.company_name}{v.designation ? ` · ${v.designation}` : ''}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${v.visitCount > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {v.visitCount} visit{v.visitCount !== 1 ? 's' : ''}
+                  </span>
+                  <div className="flex gap-1 shrink-0">
+                    {POSITIONS.map(pos => (
+                      <button
+                        key={pos}
+                        onClick={() => assign(v.id, pos)}
+                        className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
+                          currentPos === pos
+                            ? 'bg-primary text-white'
+                            : 'border border-gray-300 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {LABELS[pos]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400 text-right">{rankLabel(w.position)}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
