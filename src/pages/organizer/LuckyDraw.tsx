@@ -159,7 +159,8 @@ export default function LuckyDraw() {
       }
     } catch {}
 
-    if (!riggedOverride && pool.length === 0) return
+    const drawablePool = pool.filter(c => !activeWinners.some(w => w.visitor_id === c.id))
+    if (!riggedOverride && drawablePool.length === 0) return
 
     let winnerId: string
     let displayName: string
@@ -174,8 +175,8 @@ export default function LuckyDraw() {
       displayDesignation = riggedOverride.designation
       displayEmail = snapshot.find(s => s.visitor_id === riggedOverride!.visitor_id)?.email ?? ''
     } else {
-      winnerId = fairDraw(pool)
-      const winnerCandidate = pool.find(c => c.id === winnerId)!
+      winnerId = fairDraw(drawablePool)
+      const winnerCandidate = drawablePool.find(c => c.id === winnerId)!
       const profile = snapshot.find(s => s.visitor_id === winnerId)
       displayName = winnerCandidate.name
       displayEmail = winnerCandidate.email
@@ -226,7 +227,9 @@ export default function LuckyDraw() {
         }
 
         setWinners(prev => [...prev, newWinner].sort((a, b) => a.prize_rank - b.prize_rank))
-        setPool(prev => prev.filter(c => c.id !== winnerId))
+        if (!riggedOverride) {
+          setPool(prev => prev.filter(c => c.id !== winnerId))
+        }
         setNewWinnerId((inserted as { id: string }).id)
         setTimeout(() => setNewWinnerId(null), 600)
         setCelebrationWinner(newWinner)
@@ -309,9 +312,10 @@ export default function LuckyDraw() {
   })()
 
   const activeWinners = winners.filter(w => !w.redrawn)
+  const availablePool = pool.filter(c => !activeWinners.some(w => w.visitor_id === c.id))
   const nextRank = nextPrizeRank(activeWinners.map(w => w.prize_rank))
-  const canDraw = (riggedHasNext || pool.length > 0) && !drawing
-  const canRedraw = riggedHasNext || pool.length > 0
+  const canDraw = (riggedHasNext || availablePool.length > 0) && !drawing
+  const canRedraw = riggedHasNext || availablePool.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
