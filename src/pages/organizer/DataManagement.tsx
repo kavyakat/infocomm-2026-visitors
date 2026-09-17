@@ -141,7 +141,9 @@ export default function DataManagement() {
                     rows: users.map(u => ({
                       'Name': u.name,
                       'Email': u.email,
+                      'Mobile': u.mobile ?? '',
                       'Company': u.company_name ?? '',
+                      'Designation': u.designation ?? '',
                       'Visits': visits.filter(v => v.visitor_id === u.id).length,
                     })),
                   },

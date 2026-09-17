@@ -9,6 +9,7 @@ export default function Settings() {
   const [minPlatinum, setMinPlatinum] = useState(3)
   const [minCheckins, setMinCheckins] = useState(0)
   const [eventDay, setEventDay] = useState<1 | 2 | 3>(1)
+  const [overrideDay, setOverrideDay] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -19,7 +20,7 @@ export default function Settings() {
     supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day', 'registration_open'])
+      .in('key', ['min_qualifying_days', 'min_platinum_visits', 'min_total_checkins', 'current_event_day', 'event_day_override_enabled', 'registration_open'])
       .then(({ data }) => {
         if (!data) return
         const m = new Map(data.map(r => [r.key, r.value]))
@@ -28,6 +29,7 @@ export default function Settings() {
         setMinCheckins(Number(m.get('min_total_checkins') ?? 0))
         const d = Number(m.get('current_event_day') ?? 1)
         setEventDay((d >= 1 && d <= 3 ? d : 1) as 1 | 2 | 3)
+        setOverrideDay(m.get('event_day_override_enabled') === 'true')
         setSiteOpen(m.get('registration_open') === 'true')
       })
   }, [])
@@ -51,6 +53,7 @@ export default function Settings() {
       { key: 'min_platinum_visits', value: String(minPlatinum) },
       { key: 'min_total_checkins', value: String(minCheckins) },
       { key: 'current_event_day', value: String(eventDay) },
+      { key: 'event_day_override_enabled', value: String(overrideDay) },
     ])
 
     if (upsertErr) {
@@ -154,11 +157,21 @@ export default function Settings() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Current event day
             </label>
-            <div className="flex gap-3">
+            <label className="flex items-center gap-2 mb-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={overrideDay}
+                onChange={e => setOverrideDay(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <span className="text-sm text-gray-600">Override event day</span>
+            </label>
+            <div className={`flex gap-3 transition-opacity ${overrideDay ? '' : 'opacity-40 pointer-events-none'}`}>
               {([1, 2, 3] as const).map(d => (
                 <button
                   key={d}
                   type="button"
+                  disabled={!overrideDay}
                   onClick={() => setEventDay(d)}
                   className={`flex-1 py-2 rounded-lg border text-sm font-semibold transition-colors ${
                     eventDay === d
@@ -170,7 +183,11 @@ export default function Settings() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-1">All new check-ins will be recorded against this day</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {overrideDay
+                ? 'All new check-ins will be recorded against this day'
+                : 'Event day is auto-detected from the date — check the box to override'}
+            </p>
           </div>
 
           <button

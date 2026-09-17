@@ -7,7 +7,6 @@ import {
   eligibleCount,
   buildHallDistribution,
   buildHourlyDist,
-  buildTopExhibitors,
   buildEngagementDist,
 } from '../../lib/analytics'
 import { checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
@@ -21,6 +20,7 @@ type QualRow = {
   platinum: number
   social: boolean
   qualified: boolean
+  totalVisits: number
 }
 
 type Stats = {
@@ -32,7 +32,7 @@ type Stats = {
   leaderboardVisible: boolean
   hourlyDist: Array<{ hour: number; count: number }>
   dailyDist: Array<{ day: number; count: number }>
-  topExhibitors: Array<{ name: string; booth: string; count: number }>
+  allExhibitors: Array<{ name: string; booth: string; hall: string; count: number }>
   ratingDist: Array<{ label: string; count: number }>
   engagementDist: Array<{ bucket: string; count: number }>
   qualRows: QualRow[]
@@ -196,7 +196,13 @@ export default function Analytics() {
       }
       const dailyDist = [1, 2, 3].map(day => ({ day, count: dayCounts.get(day) ?? 0 }))
 
-      const topExhibitors = buildTopExhibitors(allVisits, allExhibitors)
+      const exhibitorVisitCounts = new Map<string, number>()
+      for (const v of allVisits) {
+        exhibitorVisitCounts.set(v.exhibitor_id, (exhibitorVisitCounts.get(v.exhibitor_id) ?? 0) + 1)
+      }
+      const allExhibitorsSorted = allExhibitors
+        .map(e => ({ name: e.name, booth: e.booth_number, hall: e.hall, count: exhibitorVisitCounts.get(e.id) ?? 0 }))
+        .sort((a, b) => b.count - a.count)
 
       const ratingCounts = new Map<number, number>()
       let noRating = 0
@@ -236,8 +242,9 @@ export default function Analytics() {
           platinum: result.platinumVisits,
           social,
           qualified: result.eligible,
+          totalVisits: visitorVisitCounts.get(p.id) ?? 0,
         }
-      })
+      }).sort((a, b) => b.totalVisits - a.totalVisits)
 
       const allVisitRows = (allVisitsRes.data ?? []).map((v: Record<string, unknown>) => {
         const profile = v.profiles as Record<string, unknown> | null
@@ -268,7 +275,7 @@ export default function Analytics() {
         leaderboardVisible,
         hourlyDist,
         dailyDist,
-        topExhibitors,
+        allExhibitors: allExhibitorsSorted,
         ratingDist,
         engagementDist,
         qualRows,
@@ -429,15 +436,31 @@ export default function Analytics() {
 
             {/* Most Visited Exhibitors */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Most Visited Exhibitors</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-800">Most Visited Exhibitors</h2>
+                <button
+                  onClick={() => downloadExcel('exhibitors.xlsx', [{
+                    name: 'Exhibitors',
+                    rows: stats.allExhibitors.map(e => ({
+                      'Exhibitor': e.name,
+                      'Booth': e.booth,
+                      'Hall': e.hall,
+                      'Visits': e.count,
+                    })),
+                  }])}
+                  className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50"
+                >
+                  Export
+                </button>
+              </div>
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                {stats.topExhibitors.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No visit data available.</p>
+                {stats.allExhibitors.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No exhibitors found.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 overflow-y-auto max-h-96 pr-1">
                     {(() => {
-                      const maxCount = stats.topExhibitors[0].count
-                      return stats.topExhibitors.map(ex => (
+                      const maxCount = Math.max(stats.allExhibitors[0]?.count ?? 0, 1)
+                      return stats.allExhibitors.map(ex => (
                         <HBar
                           key={`${ex.name}-${ex.booth}`}
                           value={ex.count}
@@ -506,12 +529,13 @@ export default function Analytics() {
               {stats.qualRows.length === 0 ? (
                 <p className="text-gray-500 text-sm">No visitor data available.</p>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="overflow-y-auto max-h-[500px] rounded-xl border border-gray-200">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
                         <th className="text-left px-4 py-3 font-semibold text-gray-700">Name</th>
                         <th className="text-left px-4 py-3 font-semibold text-gray-700">Company</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-700">Visits</th>
                         <th className="text-center px-4 py-3 font-semibold text-gray-700">Days</th>
                         <th className="text-left px-4 py-3 font-semibold text-gray-700">Halls</th>
                         <th className="text-center px-4 py-3 font-semibold text-gray-700">Platinum</th>
@@ -519,7 +543,7 @@ export default function Analytics() {
                         <th className="text-center px-4 py-3 font-semibold text-gray-700">Qualified</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 bg-white">
                       {stats.qualRows
                         .filter(r => qualFilter === 'all' || (qualFilter === 'qualified' ? r.qualified : !r.qualified))
                         .filter(r => !visitorSearch || r.name.toLowerCase().includes(visitorSearch.toLowerCase()) || r.company.toLowerCase().includes(visitorSearch.toLowerCase()))
@@ -529,6 +553,7 @@ export default function Analytics() {
                             <tr key={r.visitor_id} className="odd:bg-primary-subtle">
                               <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
                               <td className="px-4 py-3 text-gray-600 text-xs">{r.company}</td>
+                              <td className="px-4 py-3 text-center text-gray-700">{r.totalVisits}</td>
                               <td className="px-4 py-3 text-center text-gray-700">{r.days}</td>
                               <td className="px-4 py-3 text-gray-600 text-xs">{r.halls || '—'}</td>
                               <td className="px-4 py-3 text-center">

@@ -29,11 +29,12 @@ export default function CheckIn() {
     async function fetchDay() {
       const { data } = await supabase
         .from('settings')
-        .select('value')
-        .eq('key', 'current_event_day')
-        .single()
-      if (data?.value) {
-        const d = Number(data.value)
+        .select('key, value')
+        .in('key', ['current_event_day', 'event_day_override_enabled'])
+      if (!data) return
+      const m = new Map(data.map((r: { key: string; value: string }) => [r.key, r.value]))
+      if (m.get('event_day_override_enabled') === 'true') {
+        const d = Number(m.get('current_event_day'))
         if (d >= 1 && d <= 3) setEventDay(d as 1 | 2 | 3)
       }
     }

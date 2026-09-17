@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { buildCandidates, nextPrizeRank, type Candidate } from '../../lib/luckyDraw'
-import { fairDraw } from '../../lib/eligibility'
+import { fairDraw, checkEligibility, type EligibilityConfig } from '../../lib/eligibility'
 import { downloadExcel } from '../../lib/export'
-import { type EligibilityConfig } from '../../lib/eligibility'
 
 type SnapshotRow = {
   id: string
@@ -162,8 +161,6 @@ export default function LuckyDraw() {
         p.id,
         p.social_linkedin && p.social_instagram && p.social_facebook && p.social_youtube,
       ]))
-
-      const { checkEligibility } = await import('../../lib/eligibility')
 
       const byVisitor = new Map<string, Array<{ exhibitor_id: string; hall: string; day: 1|2|3 }>>()
       for (const v of flatVisits) {

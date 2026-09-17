@@ -182,6 +182,9 @@ describe('PIN regeneration', () => {
     const regenButtons = screen.getAllByText('Regen PIN')
     fireEvent.click(regenButtons[0])
 
+    await waitFor(() => expect(screen.getByText('Save')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Save'))
+
     await waitFor(() => expect(mockEq).toHaveBeenCalledWith('id', 'e1'))
 
     const [{ pin: newPin }] = mockUpdate.mock.calls[0] as unknown as [{ pin: string }]
@@ -215,6 +218,9 @@ describe('PIN regeneration', () => {
 
     const callsBefore = mockOrder.mock.calls.length
     fireEvent.click(screen.getByText('Regen PIN'))
+
+    await waitFor(() => expect(screen.getByText('Save')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Save'))
 
     await waitFor(() => expect(mockOrder.mock.calls.length).toBeGreaterThan(callsBefore))
   })
