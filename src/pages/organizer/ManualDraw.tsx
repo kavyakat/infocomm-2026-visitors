@@ -94,11 +94,18 @@ export default function ManualDraw() {
   }
 
   const assignedCount = Object.keys(picks).length
-  const filtered = visitors.filter(v =>
-    !search.trim() ||
-    v.name.toLowerCase().includes(search.toLowerCase()) ||
-    v.company_name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = visitors
+    .filter(v =>
+      !search.trim() ||
+      v.name.toLowerCase().includes(search.toLowerCase()) ||
+      v.company_name.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const pa = picks[a.id] ?? Infinity
+      const pb = picks[b.id] ?? Infinity
+      if (pa !== pb) return pa - pb
+      return b.visitCount - a.visitCount
+    })
 
   return (
     <div className="min-h-screen bg-gray-50">
