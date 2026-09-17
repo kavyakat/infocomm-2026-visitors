@@ -67,11 +67,7 @@ export default function LuckyDraw() {
   const [resetConfirm, setResetConfirm] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!celebrationWinner) return
-    const timer = setTimeout(() => setCelebrationWinner(null), 5000)
-    return () => clearTimeout(timer)
-  }, [celebrationWinner])
+
 
   useEffect(() => {
     if (!drawing) return
@@ -382,7 +378,6 @@ export default function LuckyDraw() {
               >
                 Continue
               </button>
-              <p className="mt-2 text-xs text-gray-400">Auto-closes in 5 s · tap anywhere to dismiss</p>
             </div>
           </div>
         </>
