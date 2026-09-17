@@ -131,7 +131,15 @@ export default function ManualDraw() {
 
         {winners.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-800">Winners</h2>
+              <button
+                onClick={() => setWinners([])}
+                className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
+              >
+                Clear
+              </button>
+            </div>
             {winners.map(w => (
               <div key={w.position} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
                 <span className="text-3xl">{rankBadge(w.position)}</span>
