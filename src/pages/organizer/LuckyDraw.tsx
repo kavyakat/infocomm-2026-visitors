@@ -297,9 +297,20 @@ export default function LuckyDraw() {
     ])
   }
 
+  const riggedHasNext = (() => {
+    try {
+      const raw = localStorage.getItem('manualDrawConfig')
+      if (!raw) return false
+      const cfg = JSON.parse(raw) as { enabled: boolean; winners: Array<{ position: number }> }
+      if (!cfg.enabled) return false
+      return [...cfg.winners].sort((a, b) => a.position - b.position)[winners.length] != null
+    } catch { return false }
+  })()
+
   const activeWinners = winners.filter(w => !w.redrawn)
   const nextRank = nextPrizeRank(activeWinners.map(w => w.prize_rank))
-  const canDraw = pool.length > 0 && !drawing
+  const canDraw = (pool.length > 0 || riggedHasNext) && !drawing
+  const canRedraw = pool.length > 0 || riggedHasNext
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -478,7 +489,9 @@ export default function LuckyDraw() {
                       {!w.redrawn && (
                         <button
                           onClick={() => redraw(w)}
-                          className="text-xs text-red-500 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50"
+                          disabled={!canRedraw}
+                          title={!canRedraw ? 'No eligible visitors remaining' : undefined}
+                          className={`text-xs border rounded px-2 py-0.5 ${canRedraw ? 'text-red-500 border-red-200 hover:bg-red-50' : 'text-gray-300 border-gray-200 cursor-not-allowed'}`}
                         >
                           Redraw
                         </button>
@@ -489,6 +502,10 @@ export default function LuckyDraw() {
               )
             })}
           </div>
+        )}
+
+        {!canRedraw && winners.some(w => !w.redrawn) && (
+          <p className="text-center text-amber-600 text-sm">No eligible visitors remaining — reset to draw again.</p>
         )}
 
       </div>
