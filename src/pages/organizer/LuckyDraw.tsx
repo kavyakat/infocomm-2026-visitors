@@ -348,9 +348,6 @@ export default function LuckyDraw() {
       <div className="max-w-2xl mx-auto p-6 space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Lucky Draw</h1>
-          {pool.length > 0 && (
-            <span className="text-sm text-gray-500">{pool.length + activeWinners.length} eligible visitor{pool.length + activeWinners.length !== 1 ? 's' : ''}</span>
-          )}
         </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
