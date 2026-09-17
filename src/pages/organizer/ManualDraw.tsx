@@ -36,6 +36,7 @@ export default function ManualDraw() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -72,9 +73,11 @@ export default function ManualDraw() {
     load()
   }, [])
 
-  useEffect(() => {
-    if (Object.keys(picks).length > 0) persistConfig(enabled, picks, visitors)
-  }, [enabled, picks, visitors])
+  function save() {
+    persistConfig(enabled, picks, visitors)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
 
   function assign(visitorId: string, position: number) {
     setPicks(prev => {
@@ -117,14 +120,22 @@ export default function ManualDraw() {
       <div className="max-w-2xl mx-auto p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">Select Winners</h2>
-          {assignedCount > 0 && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={clearAll}
-              className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
+              onClick={save}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90"
             >
-              Clear All
+              {saved ? 'Saved ✓' : 'Save'}
             </button>
-          )}
+            {assignedCount > 0 && (
+              <button
+                onClick={clearAll}
+                className="text-xs text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 font-medium"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
         </div>
 
         {assignedCount > 0 && (
@@ -133,9 +144,7 @@ export default function ManualDraw() {
               type="checkbox"
               checked={enabled}
               onChange={e => {
-                const next = e.target.checked
-                setEnabled(next)
-                persistConfig(next, picks, visitors)
+                setEnabled(e.target.checked)
               }}
               className="rounded accent-primary"
             />
